@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PetPal Admin</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div>
+        <p class="kicker">PetPal</p>
+        <h1>Admin Console</h1>
+        <p class="muted">Provider and appointment operations for the MVP.</p>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item is-active" data-view="providers">Providers</button>
+        <button class="nav-item" data-view="services">Services</button>
+        <button class="nav-item" data-view="appointments">Appointments</button>
+      </nav>
+
+      <div class="sidebar-card">
+        <span class="badge">Mock API</span>
+        <p>Replace the in-memory client in <code>app.js</code> with real <code>/admin/**</code> calls.</p>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <p class="kicker">PetPal v1.0</p>
+          <h2 id="view-title">Provider Management</h2>
+        </div>
+        <button class="ghost-button" id="refresh-button">Refresh</button>
+      </header>
+
+      <section class="metrics" id="metrics"></section>
+
+      <section class="panel view is-active" id="providers-view">
+        <div class="panel-header">
+          <div>
+            <h3>Providers</h3>
+            <p>Manage basic provider information, availability, and ratings.</p>
+          </div>
+          <button class="primary-button" id="add-provider-button">Add provider</button>
+        </div>
+
+        <div class="toolbar">
+          <input id="provider-search" type="search" placeholder="Search provider name or address">
+          <select id="provider-status-filter">
+            <option value="ALL">All statuses</option>
+            <option value="OPEN">Open</option>
+            <option value="PAUSED">Paused</option>
+            <option value="OFFLINE">Offline</option>
+          </select>
+        </div>
+
+        <div class="card-grid" id="provider-list"></div>
+      </section>
+
+      <section class="panel view" id="services-view">
+        <div class="panel-header">
+          <div>
+            <h3>Service Groups</h3>
+            <p>Placeholder rendering for provider-scoped service lists.</p>
+          </div>
+        </div>
+        <div class="placeholder-grid" id="service-groups"></div>
+      </section>
+
+      <section class="panel view" id="appointments-view">
+        <div class="panel-header">
+          <div>
+            <h3>Appointments</h3>
+            <p>Core workflow for confirm, complete, and cancel actions.</p>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <select id="appointment-status-filter">
+            <option value="ALL">All statuses</option>
+            <option value="PENDING_CONFIRM">Pending confirm</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="EXPIRED">Expired</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>User / Pet</th>
+                <th>Provider / Service</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Remark</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="appointment-list"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="provider-dialog">
+    <form id="provider-form" method="dialog" class="dialog-card">
+      <div class="dialog-header">
+        <div>
+          <p class="kicker">Provider</p>
+          <h3 id="provider-dialog-title">Add provider</h3>
+        </div>
+        <button type="button" class="icon-button" id="close-provider-dialog">x</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          <span>Name</span>
+          <input name="name" required maxlength="32">
+        </label>
+        <label>
+          <span>Type</span>
+          <select name="type" required>
+            <option value="HOSPITAL">Hospital</option>
+            <option value="GROOMING">Grooming</option>
+            <option value="BOARDING">Boarding</option>
+          </select>
+        </label>
+        <label>
+          <span>Phone</span>
+          <input name="phone" required maxlength="20">
+        </label>
+        <label>
+          <span>Status</span>
+          <select name="status" required>
+            <option value="OPEN">Open</option>
+            <option value="PAUSED">Paused</option>
+            <option value="OFFLINE">Offline</option>
+          </select>
+        </label>
+        <label class="wide">
+          <span>Address</span>
+          <input name="address" required maxlength="64">
+        </label>
+        <label>
+          <span>Rating</span>
+          <input name="rating" type="number" min="0" max="5" step="0.1" required>
+        </label>
+        <label>
+          <span>Business hours</span>
+          <input name="businessHours" required maxlength="32">
+        </label>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="ghost-button" id="cancel-provider-dialog">Cancel</button>
+        <button type="submit" class="primary-button">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+.claude/
+.hvigor/
+.idea/
+hvigorhome/
+npm-cache/
+_hvigor_home/
+_tmp_impeccable/
+
+# HarmonyOS / Node build outputs
+**/build/
+**/.preview/
+**/.hvigor/
+**/.hvigor-home/
+**/node_modules/
+**/target/
+**/.DS_Store

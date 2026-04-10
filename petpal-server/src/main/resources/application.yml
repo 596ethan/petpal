@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: petpal-server
+  datasource:
+    url: jdbc:mysql://localhost:3306/petpal?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+petpal:
+  jwt:
+    issuer: petpal
+    secret: petpal-phone-mvp-secret-key-please-change
+    access-expire-seconds: 7200
+    refresh-expire-seconds: 604800
+  storage:
+    endpoint: http://localhost:9000
+    bucket: petpal
+    access-key: minioadmin
+    secret-key: minioadmin
