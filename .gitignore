@@ -5,6 +5,8 @@ hvigorhome/
 npm-cache/
 _hvigor_home/
 _tmp_impeccable/
+AGENTS.md
+PHONE_MVP_SPEC.md
 
 # HarmonyOS / Node build outputs
 **/build/
