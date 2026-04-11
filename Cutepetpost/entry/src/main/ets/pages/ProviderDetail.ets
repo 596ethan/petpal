@@ -1,5 +1,4 @@
-﻿import router from '@ohos.router';
-import { Pet, ServiceItem, ServiceProvider } from '../models/PetPalModels';
+﻿import { Pet, ServiceItem, ServiceProvider } from '../models/PetPalModels';
 import { AppointmentCreateInput, PetPalRepository } from '../repository/PetPalRepository';
 import { PetPalTheme, providerSurface, providerTone, providerTypeText } from '../ui/PetPalTheme';
 
@@ -16,7 +15,7 @@ function ProviderChip(label: string, backgroundColor: string, fontColor: string)
 @Entry
 @Component
 struct ProviderDetail {
-  private providerId: number = Number((router.getParams() as Record<string, string>).providerId ?? '1')
+  private providerId: number = Number((this.getUIContext().getRouter().getParams() as Record<string, string>).providerId ?? '1')
   @State provider: ServiceProvider = PetPalRepository.getProviderById(this.providerId)
   @State items: ServiceItem[] = PetPalRepository.getServices(this.providerId)
   @State pets: Pet[] = PetPalRepository.getPets()
@@ -303,4 +302,5 @@ struct ProviderDetail {
     .alignItems(HorizontalAlign.Start)
   }
 }
+
 

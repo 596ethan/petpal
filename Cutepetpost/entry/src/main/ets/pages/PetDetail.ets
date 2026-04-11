@@ -1,5 +1,4 @@
-﻿import router from '@ohos.router';
-import { HealthRecord, Pet, VaccineRecord } from '../models/PetPalModels';
+﻿import { HealthRecord, Pet, VaccineRecord } from '../models/PetPalModels';
 import { PetPalRepository } from '../repository/PetPalRepository';
 import { genderText, PetPalTheme, speciesText } from '../ui/PetPalTheme';
 
@@ -36,7 +35,7 @@ function DetailChip(label: string, backgroundColor: string, fontColor: string) {
 @Entry
 @Component
 struct PetDetail {
-  private petId: number = Number((router.getParams() as Record<string, string>).petId ?? '1')
+  private petId: number = Number((this.getUIContext().getRouter().getParams() as Record<string, string>).petId ?? '1')
   @State pet: Pet = PetPalRepository.getPetById(this.petId)
   @State health: HealthRecord[] = PetPalRepository.getHealthRecords(this.petId)
   @State vaccines: VaccineRecord[] = PetPalRepository.getVaccines(this.petId)
@@ -185,4 +184,5 @@ struct PetDetail {
     .borderRadius(PetPalTheme.radiusPanel)
   }
 }
+
 

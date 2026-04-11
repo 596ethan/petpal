@@ -1,5 +1,4 @@
-﻿import router from '@ohos.router';
-import { PetPalRepository } from '../repository/PetPalRepository';
+﻿import { PetPalRepository } from '../repository/PetPalRepository';
 import { PetPalTheme } from '../ui/PetPalTheme';
 
 @Builder
@@ -35,7 +34,7 @@ struct Login {
     try {
       const session = await PetPalRepository.login(phone, password);
       PetPalRepository.storeSession(session);
-      router.replaceUrl({ url: 'pages/Index' });
+      await this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : String(error);
       const normalizedMessage = rawMessage.toLowerCase();
@@ -160,7 +159,7 @@ struct Login {
             .backgroundColor(PetPalTheme.surfaceWarm)
             .borderRadius(PetPalTheme.radiusChip)
             .onClick(() => {
-              router.back()
+              this.getUIContext().getRouter().back()
             })
         }
         .width('100%')
@@ -176,5 +175,6 @@ struct Login {
     .backgroundColor(PetPalTheme.background)
   }
 }
+
 
 

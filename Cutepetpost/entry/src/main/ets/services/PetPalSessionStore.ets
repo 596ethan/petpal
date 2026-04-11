@@ -1,4 +1,4 @@
-import common from '@ohos.app.ability.common';
+﻿import common from '@ohos.app.ability.common';
 import preferences from '@ohos.data.preferences';
 import { UserProfile } from '../models/PetPalModels';
 
@@ -18,67 +18,81 @@ export class PetPalSessionStore {
   private static snapshot: PetPalSessionSnapshot | null = null;
 
   static initialize(context: common.UIAbilityContext): void {
-    this.context = context;
-    this.pref = preferences.getPreferencesSync(context, { name: SESSION_STORAGE_NAME });
-    const storedSnapshot = this.readSnapshot();
-    if (storedSnapshot) {
-      this.snapshot = storedSnapshot;
+    PetPalSessionStore.context = context;
+    try {
+      const options: preferences.Options = { name: SESSION_STORAGE_NAME };
+      PetPalSessionStore.pref = preferences.getPreferencesSync(context, options);
+      const storedSnapshot = PetPalSessionStore.readSnapshot();
+      if (storedSnapshot) {
+        PetPalSessionStore.snapshot = storedSnapshot;
+      }
+    } catch {
+      PetPalSessionStore.pref = null;
+      PetPalSessionStore.snapshot = null;
     }
   }
 
   static isInitialized(): boolean {
-    return this.pref !== null;
+    return PetPalSessionStore.pref !== null;
   }
 
   static isAuthenticated(): boolean {
-    return (this.snapshot?.accessToken ?? '').length > 0;
+    return (PetPalSessionStore.snapshot?.accessToken ?? '').length > 0;
   }
 
   static getAccessToken(): string {
-    return this.snapshot?.accessToken ?? '';
+    return PetPalSessionStore.snapshot?.accessToken ?? '';
   }
 
   static getUserProfile(): UserProfile | undefined {
-    return this.snapshot?.userProfile;
+    return PetPalSessionStore.snapshot?.userProfile;
   }
 
   static getSnapshot(): PetPalSessionSnapshot | null {
-    return this.snapshot;
+    return PetPalSessionStore.snapshot;
   }
 
   static getAuthHeaders(): Record<string, string> {
-    const token = this.getAccessToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = {};
+    const token = PetPalSessionStore.getAccessToken();
+    if (token.length > 0) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   static async setSession(snapshot: PetPalSessionSnapshot): Promise<void> {
-    this.snapshot = this.normalizeSnapshot(snapshot);
-    await this.persistSnapshot();
+    PetPalSessionStore.snapshot = PetPalSessionStore.normalizeSnapshot(snapshot);
+    await PetPalSessionStore.persistSnapshot();
   }
 
   static async setAccessToken(accessToken: string): Promise<void> {
-    await this.setSession({
+    await PetPalSessionStore.setSession({
       accessToken: accessToken,
-      refreshToken: this.snapshot?.refreshToken,
-      expiresAt: this.snapshot?.expiresAt,
-      userProfile: this.snapshot?.userProfile
+      refreshToken: PetPalSessionStore.snapshot?.refreshToken,
+      expiresAt: PetPalSessionStore.snapshot?.expiresAt,
+      userProfile: PetPalSessionStore.snapshot?.userProfile
     });
   }
 
   static async setUserProfile(userProfile: UserProfile): Promise<void> {
-    await this.setSession({
-      accessToken: this.getAccessToken(),
-      refreshToken: this.snapshot?.refreshToken,
-      expiresAt: this.snapshot?.expiresAt,
+    await PetPalSessionStore.setSession({
+      accessToken: PetPalSessionStore.getAccessToken(),
+      refreshToken: PetPalSessionStore.snapshot?.refreshToken,
+      expiresAt: PetPalSessionStore.snapshot?.expiresAt,
       userProfile: userProfile
     });
   }
 
   static async clear(): Promise<void> {
-    this.snapshot = null;
-    if (this.pref) {
-      await this.pref.clear();
-      await this.pref.flush();
+    PetPalSessionStore.snapshot = null;
+    if (PetPalSessionStore.pref) {
+      try {
+        await PetPalSessionStore.pref.clear();
+        await PetPalSessionStore.pref.flush();
+      } catch {
+        return;
+      }
     }
   }
 
@@ -92,11 +106,16 @@ export class PetPalSessionStore {
   }
 
   private static readSnapshot(): PetPalSessionSnapshot | null {
-    if (!this.pref) {
-      return this.snapshot;
+    if (!PetPalSessionStore.pref) {
+      return PetPalSessionStore.snapshot;
     }
 
-    const raw = this.pref.get(SESSION_STORAGE_KEY, '') as string;
+    let raw: string = '';
+    try {
+      raw = PetPalSessionStore.pref.getSync(SESSION_STORAGE_KEY, '') as string;
+    } catch {
+      return null;
+    }
     if (!raw) {
       return null;
     }
@@ -106,23 +125,33 @@ export class PetPalSessionStore {
       if (!parsed.accessToken) {
         return null;
       }
-      return this.normalizeSnapshot(parsed);
+      return PetPalSessionStore.normalizeSnapshot(parsed);
     } catch {
       return null;
     }
   }
 
   private static async persistSnapshot(): Promise<void> {
-    if (!this.pref) {
+    if (!PetPalSessionStore.pref) {
       return;
     }
-    if (!this.snapshot || !this.snapshot.accessToken) {
-      await this.pref.delete(SESSION_STORAGE_KEY);
-      await this.pref.flush();
+    if (!PetPalSessionStore.snapshot || !PetPalSessionStore.snapshot.accessToken) {
+      try {
+        await PetPalSessionStore.pref.delete(SESSION_STORAGE_KEY);
+        await PetPalSessionStore.pref.flush();
+      } catch {
+        return;
+      }
       return;
     }
 
-    await this.pref.put(SESSION_STORAGE_KEY, JSON.stringify(this.snapshot));
-    await this.pref.flush();
+    try {
+      await PetPalSessionStore.pref.put(SESSION_STORAGE_KEY, JSON.stringify(PetPalSessionStore.snapshot));
+      await PetPalSessionStore.pref.flush();
+    } catch {
+      return;
+    }
   }
 }
+
+

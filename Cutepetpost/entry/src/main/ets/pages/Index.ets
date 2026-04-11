@@ -1,5 +1,4 @@
-﻿import router from '@ohos.router';
-import {
+﻿import {
   Appointment,
   Pet,
   Post,
@@ -81,7 +80,8 @@ struct Index {
   private async refreshData() {
     try {
       this.refreshError = ''
-      this.posts = PetPalRepository.getPosts()
+      const remotePosts = await PetPalRepository.getPostsAsync()
+      this.posts = remotePosts.length > 0 ? remotePosts : PetPalRepository.getPosts()
       this.providers = await PetPalRepository.getProvidersAsync()
       if (PetPalRepository.getSession() === null) {
         this.pets = []
@@ -297,7 +297,7 @@ struct Index {
             .backgroundColor('rgba(255, 248, 243, 0.14)')
             .borderRadius(PetPalTheme.radiusChip)
             .onClick(() => {
-              router.pushUrl({ url: 'pages/Login' })
+              void this.getUIContext().getRouter().pushUrl({ url: 'pages/Login' })
             })
         }
         Row({ space: 10 }) {
@@ -470,7 +470,7 @@ struct Index {
             .backgroundColor(PetPalTheme.primary)
             .borderRadius(PetPalTheme.radiusChip)
             .onClick(() => {
-              router.pushUrl({ url: 'pages/PostDetail', params: { postId: `${item.id}` } })
+              void this.getUIContext().getRouter().pushUrl({ url: 'pages/PostDetail', params: { postId: `${item.id}` } })
             })
         }
         .alignItems(HorizontalAlign.Start)
@@ -568,7 +568,7 @@ struct Index {
             .backgroundColor(featured ? PetPalTheme.primary : PetPalTheme.text)
             .borderRadius(PetPalTheme.radiusChip)
             .onClick(() => {
-              router.pushUrl({ url: 'pages/PostDetail', params: { postId: `${item.id}` } })
+              void this.getUIContext().getRouter().pushUrl({ url: 'pages/PostDetail', params: { postId: `${item.id}` } })
             })
         }
         .alignItems(HorizontalAlign.Start)
@@ -622,7 +622,7 @@ struct Index {
         .backgroundColor(providerTone(item.type))
         .borderRadius(PetPalTheme.radiusChip)
         .onClick(() => {
-          router.pushUrl({ url: 'pages/ProviderDetail', params: { providerId: `${item.id}` } })
+          void this.getUIContext().getRouter().pushUrl({ url: 'pages/ProviderDetail', params: { providerId: `${item.id}` } })
         })
     }
     .width('100%')
@@ -711,7 +711,7 @@ struct Index {
           .backgroundColor(providerTone(item.type))
           .borderRadius(PetPalTheme.radiusChip)
           .onClick(() => {
-            router.pushUrl({ url: 'pages/ProviderDetail', params: { providerId: `${item.id}` } })
+            void this.getUIContext().getRouter().pushUrl({ url: 'pages/ProviderDetail', params: { providerId: `${item.id}` } })
           })
       }
       .justifyContent(FlexAlign.Center)
@@ -805,7 +805,7 @@ struct Index {
           .backgroundColor(PetPalTheme.text)
           .borderRadius(PetPalTheme.radiusChip)
           .onClick(() => {
-            router.pushUrl({ url: 'pages/PetDetail', params: { petId: `${item.id}` } })
+            void this.getUIContext().getRouter().pushUrl({ url: 'pages/PetDetail', params: { petId: `${item.id}` } })
           })
       }
       .alignItems(HorizontalAlign.Start)
@@ -817,6 +817,9 @@ struct Index {
     .borderRadius(PetPalTheme.radiusPanel)
   }
 }
+
+
+
 
 
 

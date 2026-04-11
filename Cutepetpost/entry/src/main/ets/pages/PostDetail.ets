@@ -1,5 +1,4 @@
-﻿import router from '@ohos.router';
-import { CommentItem, Post } from '../models/PetPalModels';
+﻿import { CommentItem, Post } from '../models/PetPalModels';
 import { PetPalRepository } from '../repository/PetPalRepository';
 import { PetPalTheme } from '../ui/PetPalTheme';
 
@@ -16,8 +15,22 @@ function PostChip(label: string, backgroundColor: string, fontColor: string) {
 @Entry
 @Component
 struct PostDetail {
-  private post: Post = PetPalRepository.getPostById(Number((router.getParams() as Record<string, string>).postId ?? '1'))
-  private comments: CommentItem[] = PetPalRepository.getComments(this.post.id)
+  private readonly postId: number = Number((this.getUIContext().getRouter().getParams() as Record<string, string>).postId ?? '1')
+  @State post: Post = PetPalRepository.getPostById(this.postId)
+  @State comments: CommentItem[] = PetPalRepository.getComments(this.post.id)
+
+  aboutToAppear() {
+    void this.refreshPost()
+  }
+
+  private async refreshPost(): Promise<void> {
+    try {
+      this.post = await PetPalRepository.getPostByIdAsync(this.postId)
+      this.comments = await PetPalRepository.getCommentsAsync(this.postId)
+    } catch {
+      // Keep local fallback data when remote fetch fails.
+    }
+  }
 
   build() {
     Scroll() {
@@ -86,10 +99,10 @@ struct PostDetail {
       Row({ space: 10 }) {
         ForEach(this.post.imageUrls, (imageUrl: string, index: number) => {
           Image(imageUrl)
-          .width(index === 0 ? 138 : 108)
-          .height(index === 0 ? 148 : 118)
-          .objectFit(ImageFit.Cover)
-          .borderRadius(PetPalTheme.radiusPanel)
+            .width(index === 0 ? 138 : 108)
+            .height(index === 0 ? 148 : 118)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(PetPalTheme.radiusPanel)
         })
       }
     }
