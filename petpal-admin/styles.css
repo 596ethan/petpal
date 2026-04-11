@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color-scheme: light;
   --bg: #f5f1ea;
   --panel: #ffffff;
@@ -94,6 +94,43 @@ select {
   padding: 18px;
 }
 
+.sidebar-form {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 10px;
+}
+
+.sidebar-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-form span,
+.form-grid span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sidebar-form input,
+.form-grid input,
+.form-grid select,
+.toolbar input,
+.toolbar select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fffdfa;
+}
+
+.status-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .badge {
   display: inline-block;
   padding: 6px 10px;
@@ -115,11 +152,55 @@ select {
 .panel-header,
 .toolbar,
 .dialog-header,
-.dialog-actions {
+.dialog-actions,
+.topbar-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.topbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef6f7;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-banner {
+  padding: 14px 16px;
+  border-radius: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+.status-banner.is-info {
+  background: #f6f7fb;
+  color: #475467;
+  border-color: #d8deee;
+}
+
+.status-banner.is-success {
+  background: #e9f7ef;
+  color: #1d6b3d;
+  border-color: #c8ebd5;
+}
+
+.status-banner.is-error {
+  background: #fdecec;
+  color: #a33a3a;
+  border-color: #f4c9c9;
 }
 
 .metrics {
@@ -157,18 +238,6 @@ select {
   margin: 16px 0 18px;
 }
 
-.toolbar input,
-.toolbar select,
-.form-grid input,
-.form-grid select {
-  width: 100%;
-  min-height: 46px;
-  padding: 0 14px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: #fffdfa;
-}
-
 .card-grid,
 .placeholder-grid {
   display: grid;
@@ -191,6 +260,24 @@ select {
   gap: 12px;
 }
 
+.provider-card h4,
+.service-card h4 {
+  margin: 0 0 6px;
+}
+
+.provider-card p,
+.service-card p,
+.provider-card ul,
+.service-card ul {
+  margin: 0;
+  color: var(--muted);
+}
+
+.provider-card ul,
+.service-card ul {
+  padding-left: 18px;
+}
+
 .meta,
 .actions {
   display: flex;
@@ -204,6 +291,19 @@ select {
   border-radius: 999px;
   background: #eef6f7;
   color: var(--accent-2);
+  font-size: 12px;
+}
+
+.empty-state {
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  color: var(--muted);
+  background: #fffdfa;
+}
+
+.muted-inline {
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -237,6 +337,12 @@ td {
   border-radius: 14px;
   background: #f3ede2;
   color: var(--ink);
+}
+
+.ghost-button:disabled,
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .form-grid {

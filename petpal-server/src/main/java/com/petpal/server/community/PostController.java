@@ -3,7 +3,6 @@ package com.petpal.server.community;
 import com.petpal.server.common.api.ApiResponse;
 import com.petpal.server.community.dto.PostCommentDto;
 import com.petpal.server.community.dto.PostDto;
-import com.petpal.server.demo.DemoDataStore;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/post")
 public class PostController {
-  private final DemoDataStore demoDataStore;
+  private final CommunityQueryService communityQueryService;
 
-  public PostController(DemoDataStore demoDataStore) {
-    this.demoDataStore = demoDataStore;
+  public PostController(CommunityQueryService communityQueryService) {
+    this.communityQueryService = communityQueryService;
   }
 
   @PostMapping
@@ -29,13 +28,12 @@ public class PostController {
 
   @GetMapping("/feed")
   public ApiResponse<List<PostDto>> feed() {
-    return ApiResponse.ok(demoDataStore.posts());
+    return ApiResponse.ok(communityQueryService.feed());
   }
 
   @GetMapping("/{postId}")
   public ApiResponse<PostDto> detail(@PathVariable Long postId) {
-    PostDto post = demoDataStore.posts().stream().filter(item -> item.id().equals(postId)).findFirst().orElse(demoDataStore.posts().get(0));
-    return ApiResponse.ok(post);
+    return ApiResponse.ok(communityQueryService.detail(postId));
   }
 
   @DeleteMapping("/{postId}")
@@ -60,6 +58,6 @@ public class PostController {
 
   @GetMapping("/{postId}/comment")
   public ApiResponse<List<PostCommentDto>> comments(@PathVariable Long postId) {
-    return ApiResponse.ok(demoDataStore.comments(postId));
+    return ApiResponse.ok(communityQueryService.comments(postId));
   }
 }

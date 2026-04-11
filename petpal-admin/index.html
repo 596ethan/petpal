@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -12,7 +12,7 @@
       <div>
         <p class="kicker">PetPal</p>
         <h1>Admin Console</h1>
-        <p class="muted">Provider and appointment operations for the MVP.</p>
+        <p class="muted">Real HTTP controls for provider and appointment operations.</p>
       </div>
 
       <nav class="nav">
@@ -22,8 +22,20 @@
       </nav>
 
       <div class="sidebar-card">
-        <span class="badge">Mock API</span>
-        <p>Replace the in-memory client in <code>app.js</code> with real <code>/admin/**</code> calls.</p>
+        <span class="badge">HTTP API</span>
+        <p>Configure backend access for the real admin client.</p>
+        <form id="settings-form" class="sidebar-form">
+          <label>
+            <span>API base URL</span>
+            <input id="api-base-url" type="url" placeholder="http://127.0.0.1:8080">
+          </label>
+          <label>
+            <span>Admin token</span>
+            <input id="admin-token" type="password" placeholder="Optional token">
+          </label>
+          <button type="submit" class="primary-button">Save settings</button>
+        </form>
+        <p class="status-line" id="connection-status">Not connected</p>
       </div>
     </aside>
 
@@ -33,8 +45,13 @@
           <p class="kicker">PetPal v1.0</p>
           <h2 id="view-title">Provider Management</h2>
         </div>
-        <button class="ghost-button" id="refresh-button">Refresh</button>
+        <div class="topbar-actions">
+          <span class="status-pill" id="api-mode">Disconnected</span>
+          <button class="ghost-button" id="refresh-button">Refresh</button>
+        </div>
       </header>
+
+      <div class="status-banner" id="app-banner" hidden></div>
 
       <section class="metrics" id="metrics"></section>
 
@@ -42,7 +59,7 @@
         <div class="panel-header">
           <div>
             <h3>Providers</h3>
-            <p>Manage basic provider information, availability, and ratings.</p>
+            <p>Manage provider records backed by the server.</p>
           </div>
           <button class="primary-button" id="add-provider-button">Add provider</button>
         </div>
@@ -64,7 +81,7 @@
         <div class="panel-header">
           <div>
             <h3>Service Groups</h3>
-            <p>Placeholder rendering for provider-scoped service lists.</p>
+            <p>Read-only service lists loaded from the backend.</p>
           </div>
         </div>
         <div class="placeholder-grid" id="service-groups"></div>

@@ -8,9 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -27,6 +30,12 @@ class PetPalServerMvcTest {
 
   @Autowired
   private MockMvc mockMvc;
+
+  @Autowired
+  private ObjectMapper objectMapper;
+
+  @Value("${petpal.admin.token}")
+  private String adminToken;
 
   @Test
   void loginReturnsProfileAndJwtTokens() throws Exception {
@@ -64,6 +73,13 @@ class PetPalServerMvcTest {
   void appointmentListRejectsUnauthenticatedAccess() throws Exception {
     mockMvc.perform(get("/api/appointment/list"))
       .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void adminEndpointsRejectMissingToken() throws Exception {
+    mockMvc.perform(get("/admin/providers"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("ADMIN_UNAUTHORIZED"));
   }
 
   @Test
@@ -128,6 +144,7 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk());
 
     mockMvc.perform(put("/admin/appointments/2/status")
+        .header("X-PetPal-Admin-Token", adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("""
           {
@@ -145,6 +162,7 @@ class PetPalServerMvcTest {
   @Test
   void adminRejectsIllegalStatusTransition() throws Exception {
     mockMvc.perform(put("/admin/appointments/1/status")
+        .header("X-PetPal-Admin-Token", adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("""
           {
@@ -174,6 +192,7 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk());
 
     mockMvc.perform(put("/admin/appointments/2/status")
+        .header("X-PetPal-Admin-Token", adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("""
           {
@@ -184,6 +203,7 @@ class PetPalServerMvcTest {
       .andExpect(jsonPath("$.data.status", equalTo("CONFIRMED")));
 
     mockMvc.perform(put("/admin/appointments/2/status")
+        .header("X-PetPal-Admin-Token", adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content("""
           {
@@ -192,6 +212,55 @@ class PetPalServerMvcTest {
           """))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.data.status", equalTo("COMPLETED")));
+  }
+
+  @Test
+  void adminCanCreateAndUpdateProvider() throws Exception {
+    MvcResult createResult = mockMvc.perform(post("/admin/providers")
+        .header("X-PetPal-Admin-Token", adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Test Clinic",
+            "type": "HOSPITAL",
+            "address": "Test Address 1",
+            "phone": "021-10000000",
+            "rating": 4.9,
+            "businessHours": "08:00-18:00",
+            "status": "OPEN"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.name").value("Test Clinic"))
+      .andExpect(jsonPath("$.data.type").value("HOSPITAL"))
+      .andReturn();
+
+    long providerId = readDataId(createResult.getResponse().getContentAsString());
+
+    mockMvc.perform(put("/admin/providers/{id}", providerId)
+        .header("X-PetPal-Admin-Token", adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Updated Clinic",
+            "type": "GROOMING",
+            "address": "Updated Address 2",
+            "phone": "021-20000000",
+            "rating": 4.5,
+            "businessHours": "10:00-19:00",
+            "status": "PAUSED"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.name").value("Updated Clinic"))
+      .andExpect(jsonPath("$.data.type").value("GROOMING"))
+      .andExpect(jsonPath("$.data.status").value("PAUSED"));
+
+    mockMvc.perform(get("/api/provider/{id}", providerId))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.name").value("Updated Clinic"))
+      .andExpect(jsonPath("$.data.address").value("Updated Address 2"))
+      .andExpect(jsonPath("$.data.rating").value(4.5));
   }
 
   private String loginAndGetAccessToken(String phone, String password) throws Exception {
@@ -211,5 +280,10 @@ class PetPalServerMvcTest {
     int start = body.indexOf(marker) + marker.length();
     int end = body.indexOf('"', start);
     return body.substring(start, end);
+  }
+
+  private long readDataId(String body) throws Exception {
+    JsonNode root = objectMapper.readTree(body);
+    return root.path("data").path("id").asLong();
   }
 }

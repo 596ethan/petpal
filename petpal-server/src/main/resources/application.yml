@@ -14,6 +14,8 @@ spring:
       port: 6379
 
 petpal:
+  admin:
+    token: petpal-admin-token-change-me
   jwt:
     issuer: petpal
     secret: petpal-phone-mvp-secret-key-please-change

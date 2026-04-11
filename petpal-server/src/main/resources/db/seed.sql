@@ -33,3 +33,12 @@ INSERT INTO service_item (id, provider_id, name, price, duration) VALUES
 
 INSERT INTO appointment (id, order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark) VALUES
 (1, 'PP202603260001', 1, 1, 1, 2, 'CONFIRMED', '2026-12-29 10:30:00', 'Arrive 10 minutes early');
+
+INSERT INTO post (id, user_id, pet_id, content, like_count, comment_count, visibility, status, created_at, updated_at) VALUES
+(1, 1, 1, 'Nuomi finished the vaccine today and is already back to sunbathing. #catlife #vaccine', 23, 2, 'PUBLIC', 'ACTIVE', '2026-03-24 18:20:00', '2026-03-24 18:20:00'),
+(2, 2, 2, 'Qiqi got a full grooming session and came out looking much more energetic. #doglife #grooming', 56, 1, 'PUBLIC', 'ACTIVE', '2026-03-23 13:10:00', '2026-03-23 13:10:00');
+
+INSERT INTO comment (id, post_id, parent_id, user_id, content, created_at) VALUES
+(1, 1, NULL, 2, 'Looks great, and the energy is stable again.', '2026-03-24 19:10:00'),
+(2, 1, 1, 1, 'Yes, the vet also said everything is stable.', '2026-03-24 19:18:00'),
+(3, 2, NULL, 1, 'The grooming team did a careful job.', '2026-03-23 13:40:00');
