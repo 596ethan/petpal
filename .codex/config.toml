@@ -1,0 +1,7 @@
+# Project-local Codex configuration placeholder.
+# Keep durable project behavior in AGENTS.md unless a Codex runtime setting is required here.
+
+
+model = "gpt-5.4"                  # 或你想用的支持大上下文的模型
+model_context_window = 1000000     # 设置为 1M tokens
+model_auto_compact_token_limit = 900000  # 推荐值：自动压缩阈值，留点余量（常见设置 800000~950000）

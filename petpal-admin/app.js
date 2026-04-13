@@ -186,7 +186,7 @@ async function requestJson(path, options = {}) {
     ...(options.headers || {})
   };
   if (state.settings.adminToken) {
-    headers.Authorization = `Bearer ${state.settings.adminToken}`;
+    headers['X-PetPal-Admin-Token'] = state.settings.adminToken;
   }
 
   const response = await fetch(url, {

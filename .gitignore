@@ -8,6 +8,9 @@ _tmp_impeccable/
 AGENTS.md
 PHONE_MVP_SPEC.md
 *.md
+!README.md
+!docs/
+!docs/**/*.md
 
 # HarmonyOS / Node build outputs
 **/build/

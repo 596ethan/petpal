@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -26,7 +27,10 @@ public class AppointmentService {
     ensurePetOwnedByUser(userId, request.petId());
     ensureServiceMatchesProvider(request.providerId(), request.serviceId());
     String orderNo = "PP" + System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(100, 1000);
-    LocalDateTime appointmentTime = LocalDateTime.parse(request.appointmentTime());
+    LocalDateTime appointmentTime = parseAppointmentTime(request.appointmentTime());
+    if (!appointmentTime.isAfter(LocalDateTime.now())) {
+      throw new AppException(400, "APPOINTMENT_TIME_IN_PAST", "Appointment time must be in the future");
+    }
     jdbcClient.sql("""
       INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
       VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
@@ -144,6 +148,14 @@ public class AppointmentService {
       .single();
     if (count == null || count == 0) {
       throw new AppException(400, "SERVICE_NOT_AVAILABLE", "Service does not belong to provider");
+    }
+  }
+
+  private LocalDateTime parseAppointmentTime(String appointmentTime) {
+    try {
+      return LocalDateTime.parse(appointmentTime);
+    } catch (DateTimeParseException ex) {
+      throw new AppException(400, "INVALID_APPOINTMENT_TIME", "Appointment time must use ISO 8601 format");
     }
   }
 

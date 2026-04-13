@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.springframework.http.HttpMethod;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -19,6 +20,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AdminTokenFilter extends OncePerRequestFilter {
   private static final String HEADER_NAME = "X-PetPal-Admin-Token";
+  private static final String AUTHORIZATION_HEADER = "Authorization";
+  private static final String BEARER_PREFIX = "Bearer ";
 
   private final String adminToken;
 
@@ -28,13 +31,13 @@ public class AdminTokenFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return !request.getRequestURI().startsWith("/admin");
+    return HttpMethod.OPTIONS.matches(request.getMethod()) || !request.getRequestURI().startsWith("/admin");
   }
 
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
-    String token = request.getHeader(HEADER_NAME);
+    String token = resolveAdminToken(request);
     if (token == null || !adminToken.equals(token)) {
       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       response.setCharacterEncoding(StandardCharsets.UTF_8.name());
@@ -54,5 +57,17 @@ public class AdminTokenFilter extends OncePerRequestFilter {
     } finally {
       SecurityContextHolder.clearContext();
     }
+  }
+
+  private String resolveAdminToken(HttpServletRequest request) {
+    String token = request.getHeader(HEADER_NAME);
+    if (token != null && !token.isBlank()) {
+      return token;
+    }
+    String authorization = request.getHeader(AUTHORIZATION_HEADER);
+    if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
+      return authorization.substring(BEARER_PREFIX.length());
+    }
+    return null;
   }
 }

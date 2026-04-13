@@ -141,6 +141,21 @@ interface LoginRequestPayload {
   password: string;
 }
 
+export interface PetPalRepositoryRequest {
+  path: string;
+  method: http.RequestMethod;
+  body?: Object;
+  authRequired: boolean;
+  headers: Record<string, string>;
+}
+
+export interface PetPalRepositoryResponse {
+  responseCode: number;
+  result: string;
+}
+
+export type PetPalRepositoryRequestHandler = (request: PetPalRepositoryRequest) => Promise<PetPalRepositoryResponse>;
+
 export interface AppointmentCreateInput {
   petId: number;
   providerId: number;
@@ -154,6 +169,7 @@ export class PetPalRepository {
   private static session: LoginSession | null = null;
   private static postCache: Post[] = posts;
   private static commentCache: Record<number, CommentItem[]> = {};
+  private static testRequestHandler: PetPalRepositoryRequestHandler | null = null;
 
   static initialize(context: common.UIAbilityContext): void {
     PetPalSessionStore.initialize(context);
@@ -189,6 +205,16 @@ export class PetPalRepository {
   static clearSession(): void {
     PetPalRepository.session = null;
     void PetPalRepository.clearPersistedSession();
+  }
+
+  static setRequestHandlerForTest(handler: PetPalRepositoryRequestHandler | null): void {
+    PetPalRepository.testRequestHandler = handler;
+  }
+
+  static resetForTest(): void {
+    PetPalRepository.testRequestHandler = null;
+    PetPalRepository.session = null;
+    PetPalRepository.apiBaseUrl = PetPalRepository.normalizeBaseUrl(PETPAL_API_BASE_URL);
   }
 
   static getPets(): Pet[] {
@@ -385,14 +411,26 @@ export class PetPalRepository {
     body?: Object,
     authRequired: boolean = true
   ): Promise<T> {
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (authRequired && PetPalRepository.session !== null) {
+      headers.Authorization = `Bearer ${PetPalRepository.session.accessToken}`;
+    }
+
+    if (PetPalRepository.testRequestHandler !== null) {
+      const response = await PetPalRepository.testRequestHandler({
+        path: path,
+        method: method,
+        body: body,
+        authRequired: authRequired,
+        headers: headers
+      });
+      return PetPalRepository.parseResponse<T>(response.responseCode, response.result, authRequired);
+    }
+
     const request = http.createHttp();
     try {
-      let headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (authRequired && PetPalRepository.session !== null) {
-        headers.Authorization = `Bearer ${PetPalRepository.session.accessToken}`;
-      }
       let options: http.HttpRequestOptions = {
         method: method,
         header: headers,
@@ -440,6 +478,34 @@ export class PetPalRepository {
     } finally {
       request.destroy();
     }
+  }
+
+  private static async parseResponse<T>(responseCode: number, raw: string, authRequired: boolean): Promise<T> {
+    let envelope: BackendEnvelope<T> | null = null;
+    try {
+      envelope = JSON.parse(raw) as BackendEnvelope<T>;
+    } catch {
+      envelope = null;
+    }
+
+    if (responseCode === 401 || responseCode === 403) {
+      if (authRequired) {
+        await PetPalRepository.clearPersistedSession();
+        throw new Error(envelope?.message ?? '登录已失效，请重新登录');
+      }
+      throw new Error(envelope?.message ?? '登录失败，请检查账号密码');
+    }
+
+    if (responseCode < 200 || responseCode >= 300) {
+      throw new Error(envelope?.message ?? `HTTP ${responseCode}`);
+    }
+    if (envelope === null) {
+      throw new Error('Invalid server response');
+    }
+    if (envelope.code !== 'OK') {
+      throw new Error(envelope.message);
+    }
+    return envelope.data;
   }
 
   private static normalizeBaseUrl(baseUrl: string): string {

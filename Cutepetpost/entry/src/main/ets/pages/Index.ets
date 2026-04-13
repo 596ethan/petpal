@@ -62,15 +62,25 @@ function SoftAvatar(label: string, backgroundColor: string, fontColor: string, s
     .padding({ top: size > 40 ? 10 : 8 })
 }
 
+const EMPTY_USER: UserProfile = {
+  id: 0,
+  nickname: '',
+  bio: '',
+  avatarUrl: '',
+  followingCount: 0,
+  followerCount: 0
+}
+
 @Entry
 @Component
 struct Index {
   @State currentTab: number = 0
-  @State user: UserProfile = PetPalRepository.getCurrentUser()
-  @State pets: Pet[] = PetPalRepository.getPets()
+  @State user: UserProfile = EMPTY_USER
+  @State pets: Pet[] = []
   @State posts: Post[] = PetPalRepository.getPosts()
-  @State providers: ServiceProvider[] = PetPalRepository.getProviders()
-  @State appointments: Appointment[] = PetPalRepository.getAppointments()
+  @State providers: ServiceProvider[] = []
+  @State appointments: Appointment[] = []
+  @State isAuthenticated: boolean = PetPalRepository.getSession() !== null
   @State refreshError: string = ''
 
   aboutToAppear() {
@@ -84,10 +94,13 @@ struct Index {
       this.posts = remotePosts.length > 0 ? remotePosts : PetPalRepository.getPosts()
       this.providers = await PetPalRepository.getProvidersAsync()
       if (PetPalRepository.getSession() === null) {
+        this.isAuthenticated = false
+        this.user = EMPTY_USER
         this.pets = []
         this.appointments = []
         return
       }
+      this.isAuthenticated = true
       const user = await PetPalRepository.getCurrentUserAsync()
       const remotePets = await PetPalRepository.getPetsAsync()
       const remoteAppointments = await PetPalRepository.getAppointmentsAsync()
@@ -192,9 +205,13 @@ struct Index {
         }
         this.ServiceSection()
         SectionLead('收藏机构', '适合今天顺手预约的温柔去处', '把高频医疗、美容、寄养保留在第二层，不打断社区的入口感。')
-        ForEach(this.providers, (item: ServiceProvider, index: number) => {
-          this.ProviderStoryCard(item, index === 0)
-        })
+        if (this.providers.length > 0) {
+          ForEach(this.providers, (item: ServiceProvider, index: number) => {
+            this.ProviderStoryCard(item, index === 0)
+          })
+        } else {
+          this.EmptyStatePanel('暂无机构数据', '机构列表会在后端返回真实数据后显示。')
+        }
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 120 })
     }
@@ -234,15 +251,25 @@ struct Index {
     Scroll() {
       Column({ space: 24 }) {
         SectionLead('预约与照护', '先看今天的安排，再挑下一程服务', '预约页保留效率，但视觉像一本生活方式目录，不像表单列表。')
-        Column({ space: 12 }) {
-          ForEach(this.appointments, (item: Appointment) => {
-            this.AppointmentStoryCard(item)
-          })
+        if (!this.isAuthenticated) {
+          this.LoginRequiredPanel('登录后查看我的预约')
+        } else if (this.appointments.length > 0) {
+          Column({ space: 12 }) {
+            ForEach(this.appointments, (item: Appointment) => {
+              this.AppointmentStoryCard(item)
+            })
+          }
+        } else {
+          this.EmptyStatePanel('暂无预约', '创建第一条预约后会显示在这里。')
         }
         SectionLead('继续发现', '把机构做成像值得信任的店铺名片', '信息明确，动作直接，但层级和节奏仍然保持轻松。')
-        ForEach(this.providers, (item: ServiceProvider) => {
-          this.ProviderBookingCard(item)
-        })
+        if (this.providers.length > 0) {
+          ForEach(this.providers, (item: ServiceProvider) => {
+            this.ProviderBookingCard(item)
+          })
+        } else {
+          this.EmptyStatePanel('暂无机构数据', '请确认后端服务可用后刷新。')
+        }
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 120 })
     }
@@ -252,19 +279,74 @@ struct Index {
   MineTab() {
     Scroll() {
       Column({ space: 24 }) {
-        this.ProfileHero()
-        Row({ space: 12 }) {
-          this.NotePanel('本周记录', `${this.posts.length} 条动态`, '继续把恢复、洗护和日常都写下来。', PetPalTheme.primarySoft, PetPalTheme.primary)
-          this.NotePanel('下次提醒', this.appointments.length > 0 ? this.appointments[0].appointmentTime : '暂无预约', this.appointments.length > 0 ? '下一程照护已经排进日历。' : '创建第一条预约后会显示在这里。', PetPalTheme.accentSoft, PetPalTheme.accent)
+        if (!this.isAuthenticated) {
+          this.LoginRequiredPanel('登录后查看我的资料和宠物档案')
+        } else {
+          this.ProfileHero()
+          Row({ space: 12 }) {
+            this.NotePanel('本周记录', `${this.posts.length} 条动态`, '继续把恢复、洗护和日常都写下来。', PetPalTheme.primarySoft, PetPalTheme.primary)
+            this.NotePanel('下次提醒', this.appointments.length > 0 ? this.appointments[0].appointmentTime : '暂无预约', this.appointments.length > 0 ? '下一程照护已经排进日历。' : '创建第一条预约后会显示在这里。', PetPalTheme.accentSoft, PetPalTheme.accent)
+          }
+          .width('100%')
+          SectionLead('我的宠物档案', '每一只都有独立的照护叙事', '把体重、生日、绝育与提醒汇总成更有身份感的档案卡。')
+          if (this.pets.length > 0) {
+            ForEach(this.pets, (item: Pet) => {
+              this.PetArchiveCard(item)
+            })
+          } else {
+            this.EmptyStatePanel('暂无宠物档案', '当前账号还没有可显示的宠物数据。')
+          }
         }
-        .width('100%')
-        SectionLead('我的宠物档案', '每一只都有独立的照护叙事', '把体重、生日、绝育与提醒汇总成更有身份感的档案卡。')
-        ForEach(this.pets, (item: Pet) => {
-          this.PetArchiveCard(item)
-        })
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 120 })
     }
+  }
+
+  @Builder
+  EmptyStatePanel(title: string, subtitle: string) {
+    Column({ space: 8 }) {
+      Text(title)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PetPalTheme.text)
+      Text(subtitle)
+        .fontSize(12)
+        .lineHeight(19)
+        .fontColor(PetPalTheme.textMuted)
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(PetPalTheme.surface)
+    .borderRadius(PetPalTheme.radiusPanel)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  LoginRequiredPanel(message: string) {
+    Column({ space: 12 }) {
+      Text(message)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PetPalTheme.text)
+      Text('登录后会从后端加载当前账号的真实数据。')
+        .fontSize(12)
+        .lineHeight(19)
+        .fontColor(PetPalTheme.textMuted)
+      Button('去登录')
+        .height(40)
+        .fontSize(13)
+        .fontColor('#FFFFFF')
+        .backgroundColor(PetPalTheme.primary)
+        .borderRadius(PetPalTheme.radiusChip)
+        .onClick(() => {
+          void this.getUIContext().getRouter().pushUrl({ url: 'pages/Login' })
+        })
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(PetPalTheme.surfaceRaised)
+    .borderRadius(PetPalTheme.radiusPanel)
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder

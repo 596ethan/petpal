@@ -3,6 +3,7 @@ package com.petpal.server;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -83,6 +84,31 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void adminEndpointsRejectWrongBearerToken() throws Exception {
+    mockMvc.perform(get("/admin/providers")
+        .header("Authorization", "Bearer wrong-admin-token"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("ADMIN_UNAUTHORIZED"));
+  }
+
+  @Test
+  void adminEndpointsAcceptBearerToken() throws Exception {
+    mockMvc.perform(get("/admin/providers")
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"))
+      .andExpect(jsonPath("$.data.length()").value(greaterThan(0)));
+  }
+  @Test
+  void adminEndpointsAllowBrowserPreflight() throws Exception {
+    mockMvc.perform(options("/admin/providers")
+        .header("Origin", "null")
+        .header("Access-Control-Request-Method", "GET")
+        .header("Access-Control-Request-Headers", "x-petpal-admin-token"))
+      .andExpect(status().isOk());
+  }
+
+  @Test
   void providerListReturnsPersistedData() throws Exception {
     mockMvc.perform(get("/api/provider/list"))
       .andExpect(status().isOk())
@@ -122,6 +148,82 @@ class PetPalServerMvcTest {
       .andExpect(jsonPath("$.data.status").value("PENDING_CONFIRM"))
       .andExpect(jsonPath("$.data.petName").value("Nuomi"))
       .andExpect(jsonPath("$.data.providerName").value("Cloud Vet Center"));
+  }
+
+  @Test
+  void createAppointmentRejectsInvalidTimeFormat() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "2026-04-12 15:30",
+            "remark": "bad time"
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_APPOINTMENT_TIME"));
+  }
+
+  @Test
+  void createAppointmentRejectsPastTime() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "2026-01-01T10:00:00",
+            "remark": "past time"
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("APPOINTMENT_TIME_IN_PAST"));
+  }
+
+  @Test
+  void createAppointmentRejectsPetNotOwnedByCurrentUser() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000002", "123456");
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "2099-01-02T10:00:00",
+            "remark": "wrong pet"
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("PET_NOT_AVAILABLE"));
+  }
+
+  @Test
+  void createAppointmentRejectsServiceProviderMismatch() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 3,
+            "appointmentTime": "2099-01-02T10:00:00",
+            "remark": "wrong service"
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("SERVICE_NOT_AVAILABLE"));
   }
 
   @Test
