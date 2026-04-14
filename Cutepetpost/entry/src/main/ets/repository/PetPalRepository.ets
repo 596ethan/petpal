@@ -324,13 +324,7 @@ export class PetPalRepository {
 
   static async getHealthRecordsAsync(petId: number): Promise<HealthRecord[]> {
     const payload = await PetPalRepository.request<BackendHealthRecord[]>(`/pet/${petId}/health`, http.RequestMethod.GET);
-    return payload.map((item: BackendHealthRecord) => ({
-      id: item.id,
-      title: item.title,
-      summary: item.description ?? "",
-      recordDate: item.recordDate,
-      nextDate: item.nextDate ?? ""
-    }));
+    return payload.map((item: BackendHealthRecord) => PetPalRepository.mapHealthRecord(item));
   }
 
   static async createPet(input: PetCreateInput): Promise<Pet> {
@@ -349,24 +343,12 @@ export class PetPalRepository {
 
   static async addHealthRecord(petId: number, input: HealthRecordCreateInput): Promise<HealthRecord> {
     const payload = await PetPalRepository.request<BackendHealthRecord>(`/pet/${petId}/health`, http.RequestMethod.POST, input);
-    return {
-      id: payload.id,
-      title: payload.title,
-      summary: payload.description ?? "",
-      recordDate: payload.recordDate,
-      nextDate: payload.nextDate ?? ""
-    };
+    return PetPalRepository.mapHealthRecord(payload);
   }
 
   static async getVaccineRecords(petId: number): Promise<VaccineRecord[]> {
     const payload = await PetPalRepository.request<BackendVaccineRecord[]>(`/pet/${petId}/vaccine`, http.RequestMethod.GET);
-    return payload.map((item: BackendVaccineRecord) => ({
-      id: item.id,
-      vaccineName: item.vaccineName,
-      vaccinatedAt: item.vaccinatedAt,
-      nextDueAt: item.nextDueAt ?? "",
-      hospital: item.hospital ?? ""
-    }));
+    return payload.map((item: BackendVaccineRecord) => PetPalRepository.mapVaccineRecord(item));
   }
 
   static async getVaccineRecordsAsync(petId: number): Promise<VaccineRecord[]> {
@@ -375,13 +357,7 @@ export class PetPalRepository {
 
   static async addVaccineRecord(petId: number, input: VaccineRecordCreateInput): Promise<VaccineRecord> {
     const payload = await PetPalRepository.request<BackendVaccineRecord>(`/pet/${petId}/vaccine`, http.RequestMethod.POST, input);
-    return {
-      id: payload.id,
-      vaccineName: payload.vaccineName,
-      vaccinatedAt: payload.vaccinatedAt,
-      nextDueAt: payload.nextDueAt ?? "",
-      hospital: payload.hospital ?? ""
-    };
+    return PetPalRepository.mapVaccineRecord(payload);
   }
 
   static async getVaccinesAsync(petId: number): Promise<VaccineRecord[]> {
@@ -635,6 +611,28 @@ export class PetPalRepository {
       weight: item.weight === undefined || item.weight === null ? "" : `${item.weight}`,
       avatarUrl: item.avatarUrl ?? "",
       neutered: item.neutered
+    };
+    return result;
+  }
+
+  private static mapHealthRecord(item: BackendHealthRecord): HealthRecord {
+    const result: HealthRecord = {
+      id: item.id,
+      title: item.title,
+      summary: item.description ?? "",
+      recordDate: item.recordDate,
+      nextDate: item.nextDate ?? ""
+    };
+    return result;
+  }
+
+  private static mapVaccineRecord(item: BackendVaccineRecord): VaccineRecord {
+    const result: VaccineRecord = {
+      id: item.id,
+      vaccineName: item.vaccineName,
+      vaccinatedAt: item.vaccinatedAt,
+      nextDueAt: item.nextDueAt ?? "",
+      hospital: item.hospital ?? ""
     };
     return result;
   }

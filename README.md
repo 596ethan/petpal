@@ -20,6 +20,11 @@ PetPal is a phone-first MVP workspace for the HarmonyOS client, backend APIs, an
 7. Cancel appointment when allowed
 8. Admin confirms/completes appointment so the phone client reflects real status
 
+## Accepted Scope
+- Phone appointment main chain has passed real-device acceptance.
+- Pet Archive P0 has passed real-device acceptance for create, partial update, soft delete, add health record, view health record list, and add vaccine record.
+- Detailed acceptance records are in `docs/mvp-acceptance.md` and `docs/pet-archive-p0-device-acceptance.md`.
+
 ## Local Commands
 Start local dependencies:
 
@@ -44,9 +49,9 @@ Open `Cutepetpost` in DevEco Studio for phone preview/build.
 ## Phone Device Debugging
 For phone-device testing, the HarmonyOS app must call the backend through the development machine's LAN IP, not `127.0.0.1`.
 
-The full acceptance record is in `docs/mvp-acceptance.md`.
+The full acceptance records are in `docs/mvp-acceptance.md` and `docs/pet-archive-p0-device-acceptance.md`.
 
-1. Start local dependencies and the backend. The accepted test run used backend port `19080`; use that port if Windows reserves `8000-8099` or `8080` is unavailable.
+1. Start local dependencies and the backend. Use any available backend HTTP port, but keep the backend, phone app, and admin page on the same port. The appointment MVP accepted run used `19080`; the Pet Archive P0 accepted run used `18080` because this Windows environment reserves the `8000-8099` TCP range, including `8080`.
 
 ```powershell
 .\scripts\dev-deps-up.ps1
@@ -56,14 +61,14 @@ The full acceptance record is in `docs/mvp-acceptance.md`.
 2. Find the development machine's LAN IP and update `PETPAL_API_DEV_BASE_URL` in `Cutepetpost/entry/src/main/ets/config/PetPalAppConfig.ets`, for example:
 
 ```typescript
-export const PETPAL_API_DEV_BASE_URL: string = 'http://192.168.1.3:19080/api';
+export const PETPAL_API_DEV_BASE_URL: string = 'http://192.168.1.3:<backend-port>/api';
 ```
 
 3. Keep `PETPAL_API_BASE_URL` pointing at `PETPAL_API_DEV_BASE_URL` for local phone testing.
 
-4. Open `petpal-admin/index.html` in the development machine browser. Set API base URL to `http://127.0.0.1:19080` and admin token to `petpal-admin-token-change-me`.
+4. Open `petpal-admin/index.html` in the development machine browser. Set API base URL to the same backend port, for example `http://127.0.0.1:18080`, and admin token to `petpal-admin-token-change-me`.
 
-5. If local `MySQL80` already uses port `3306`, run the project MySQL container on another host port such as `3307`, then start the backend with a datasource URL pointing at that port while keeping the backend HTTP port at `19080`.
+5. If local `MySQL80` already uses port `3306`, run the project MySQL container on another host port such as `3307`, then start the backend with a datasource URL pointing at that database port. This is independent from the backend HTTP port.
 
 6. If the admin page shows `failed to fetch` while command-line admin API requests work, check CORS/preflight handling. The backend must allow `OPTIONS /**` and the `X-PetPal-Admin-Token` header.
 

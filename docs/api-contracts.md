@@ -258,4 +258,4 @@ Implemented transitions are enforced by backend rules. Illegal transitions retur
 
 - Refresh-token rotation is not implemented.
 - Phone client repository tests exist, but this DevEco/Hvigor project currently does not expose a local unit-test task.
-- Community feed still has demo fallback and is not part of the appointment MVP acceptance path.
+- Community feed still has demo fallback and is not part of the accepted phone scope.

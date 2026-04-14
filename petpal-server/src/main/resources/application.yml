@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PETPAL_SERVER_PORT:18080}
 
 spring:
   application:

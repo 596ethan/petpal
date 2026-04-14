@@ -18,7 +18,7 @@ This document records the current implementation only.
 - No settings screen for API base URL.
 - No refresh-token rotation.
 - No push or message notification for appointment status changes.
-- No full community production fallback removal; community remains outside the current appointment MVP path.
+- No full community production fallback removal; community remains outside the current accepted phone scope.
 - No automated phone test execution task is exposed by the current Hvigor project.
 
 ## Real Acceptance Result
@@ -34,6 +34,19 @@ Phone MVP main chain acceptance has passed on a real device:
 | Admin updates appointment status | Passed |
 | Phone refresh shows status change | Passed |
 
+Pet Archive P0 acceptance has also passed on a real device:
+
+| Checkpoint | Result |
+|---|---|
+| Create pet | Passed |
+| Partial update pet | Passed |
+| Soft delete pet | Passed |
+| Add health record | Passed |
+| View health record list | Passed |
+| Add vaccine record | Passed |
+
+The detailed Pet Archive P0 acceptance record is in `docs/pet-archive-p0-device-acceptance.md`.
+
 ## Phone Device Debugging
 
 Backend startup:
@@ -43,16 +56,16 @@ Backend startup:
 .\scripts\run-backend.ps1
 ```
 
-The accepted test run used backend port `19080`. If local Windows reserves the `8000-8099` port range or another process blocks `8080`, start the backend on `19080` and point the clients to that port.
+The appointment MVP accepted test run used backend port `19080`. The Pet Archive P0 accepted test run used backend port `18080` because this Windows environment reserves the `8000-8099` TCP range, including `8080`. Any available backend port is acceptable for local acceptance as long as the phone app and admin page point to the same running backend port.
 
-If local `MySQL80` already uses port `3306`, the accepted test run used a Docker MySQL container mapped to host port `3307`; the backend still exposed HTTP on `19080`.
+If local `MySQL80` already uses port `3306`, run the project MySQL container on another host port such as `3307`; this database port is independent from the backend HTTP port.
 
 Phone base URL:
 
 Edit `Cutepetpost/entry/src/main/ets/config/PetPalAppConfig.ets`:
 
 ```typescript
-export const PETPAL_API_DEV_BASE_URL: string = 'http://192.168.1.3:19080/api';
+export const PETPAL_API_DEV_BASE_URL: string = 'http://192.168.1.3:<backend-port>/api';
 export const PETPAL_API_BASE_URL: string = PETPAL_API_DEV_BASE_URL;
 ```
 
@@ -62,7 +75,7 @@ Admin client:
 
 - Open `petpal-admin/index.html` in the development machine browser.
 - Do not open the backend root URL directly as the admin page.
-- In the admin page, set API base URL to `http://127.0.0.1:19080`.
+- In the admin page, set API base URL to the same running backend port, for example `http://127.0.0.1:18080`.
 - Default token: `petpal-admin-token-change-me`
 
 ## CORS Debugging
@@ -105,11 +118,15 @@ Seed data:
 
 ## Acceptance Conclusion
 
-The main chain passed real-device acceptance:
+The appointment main chain passed real-device acceptance:
 
 Phone login -> view providers/services -> create appointment -> my appointments visible -> admin updates status -> phone refresh shows status change.
 
-The Phone MVP is accepted for the current scope.
+The Pet Archive P0 chain also passed real-device acceptance:
+
+Phone login -> create pet -> partial update pet -> add health record -> verify health list -> add vaccine record -> soft delete a separate pet.
+
+The Phone MVP plus Pet Archive P0 are accepted for the current sealed scope.
 
 ## Known Limits
 
@@ -117,18 +134,19 @@ The Phone MVP is accepted for the current scope.
 - Physical-device networking depends on the phone and development machine being on the same LAN, firewall access, and a stable development machine IP.
 - The phone app does not receive appointment status push updates; the user must refresh or re-enter the page.
 - The admin client is a local static HTML console, not a backend root-path page.
-- Community production fallback cleanup remains outside the accepted appointment MVP path.
+- Community production fallback cleanup remains outside the accepted phone scope.
+- Pet avatar upload, health/vaccine edit/delete, pet archive search, and admin pet management remain outside Pet Archive P0.
 
 ## Release Notes
 
 Suggested git commit message:
 
 ```text
-docs: record phone mvp acceptance
+feat: seal pet archive p0 acceptance
 ```
 
 Suggested version tag:
 
 ```text
-v0.1.0-phone-mvp-accepted
+v0.2.0-pet-archive-p0-accepted
 ```
