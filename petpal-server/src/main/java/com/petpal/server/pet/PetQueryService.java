@@ -7,6 +7,10 @@ import com.petpal.server.common.error.AppException;
 import com.petpal.server.pet.dto.HealthRecordDto;
 import com.petpal.server.pet.dto.PetDto;
 import com.petpal.server.pet.dto.VaccineRecordDto;
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -27,17 +31,7 @@ public class PetQueryService {
       ORDER BY id
       """)
       .param("userId", userId)
-      .query((rs, rowNum) -> new PetDto(
-        rs.getLong("id"),
-        rs.getString("name"),
-        PetSpecies.valueOf(rs.getString("species")),
-        rs.getString("breed"),
-        PetGender.valueOf(rs.getString("gender")),
-        rs.getDate("birthday").toString(),
-        rs.getDouble("weight"),
-        rs.getString("avatar_url"),
-        rs.getBoolean("is_neutered")
-      ))
+      .query((rs, rowNum) -> mapPet(rs))
       .list();
   }
 
@@ -49,17 +43,7 @@ public class PetQueryService {
       """)
       .param("petId", petId)
       .param("userId", userId)
-      .query((rs, rowNum) -> new PetDto(
-        rs.getLong("id"),
-        rs.getString("name"),
-        PetSpecies.valueOf(rs.getString("species")),
-        rs.getString("breed"),
-        PetGender.valueOf(rs.getString("gender")),
-        rs.getDate("birthday").toString(),
-        rs.getDouble("weight"),
-        rs.getString("avatar_url"),
-        rs.getBoolean("is_neutered")
-      ))
+      .query((rs, rowNum) -> mapPet(rs))
       .optional()
       .orElseThrow(() -> new AppException(404, "PET_NOT_FOUND", "Pet not found"));
   }
@@ -70,7 +54,7 @@ public class PetQueryService {
       SELECT id, record_type, title, description, record_date, next_date
       FROM pet_health_record
       WHERE pet_id = :petId
-      ORDER BY record_date DESC
+      ORDER BY record_date DESC, id DESC
       """)
       .param("petId", petId)
       .query((rs, rowNum) -> new HealthRecordDto(
@@ -78,8 +62,8 @@ public class PetQueryService {
         HealthRecordType.valueOf(rs.getString("record_type")),
         rs.getString("title"),
         rs.getString("description"),
-        rs.getDate("record_date").toString(),
-        rs.getDate("next_date") == null ? null : rs.getDate("next_date").toString()
+        requiredDateString(rs, "record_date"),
+        nullableDateString(rs, "next_date")
       ))
       .list();
   }
@@ -90,17 +74,46 @@ public class PetQueryService {
       SELECT id, vaccine_name, vaccinated_at, next_due_at, hospital
       FROM pet_vaccine
       WHERE pet_id = :petId
-      ORDER BY vaccinated_at DESC
+      ORDER BY vaccinated_at DESC, id DESC
       """)
       .param("petId", petId)
       .query((rs, rowNum) -> new VaccineRecordDto(
         rs.getLong("id"),
         rs.getString("vaccine_name"),
-        rs.getDate("vaccinated_at").toString(),
-        rs.getDate("next_due_at") == null ? null : rs.getDate("next_due_at").toString(),
+        requiredDateString(rs, "vaccinated_at"),
+        nullableDateString(rs, "next_due_at"),
         rs.getString("hospital")
       ))
       .list();
+  }
+
+  private PetDto mapPet(ResultSet rs) throws SQLException {
+    return new PetDto(
+      rs.getLong("id"),
+      rs.getString("name"),
+      PetSpecies.valueOf(rs.getString("species")),
+      rs.getString("breed"),
+      PetGender.valueOf(rs.getString("gender")),
+      nullableDateString(rs, "birthday"),
+      nullableDouble(rs, "weight"),
+      rs.getString("avatar_url"),
+      rs.getBoolean("is_neutered")
+    );
+  }
+
+  private String requiredDateString(ResultSet rs, String column) throws SQLException {
+    Date date = rs.getDate(column);
+    return date == null ? null : date.toString();
+  }
+
+  private String nullableDateString(ResultSet rs, String column) throws SQLException {
+    Date date = rs.getDate(column);
+    return date == null ? null : date.toString();
+  }
+
+  private Double nullableDouble(ResultSet rs, String column) throws SQLException {
+    BigDecimal value = rs.getBigDecimal(column);
+    return value == null ? null : value.doubleValue();
   }
 
   private void ensurePetOwnedByUser(long userId, Long petId) {

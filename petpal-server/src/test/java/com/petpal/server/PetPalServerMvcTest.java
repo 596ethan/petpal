@@ -2,6 +2,7 @@ package com.petpal.server;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -118,6 +119,271 @@ class PetPalServerMvcTest {
       .andExpect(jsonPath("$.data[0].type").value("HOSPITAL"));
   }
 
+  @Test
+  void createPetPersistsAndAppearsInCurrentUserList() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/pet")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Momo",
+            "species": "RABBIT",
+            "breed": "Mini Rex",
+            "gender": "UNKNOWN",
+            "birthday": "2024-02-03",
+            "weight": 2.40,
+            "avatarUrl": "https://placehold.co/120x120?text=momo",
+            "neutered": false
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"))
+      .andExpect(jsonPath("$.data.id").exists())
+      .andExpect(jsonPath("$.data.name").value("Momo"))
+      .andExpect(jsonPath("$.data.species").value("RABBIT"));
+
+    mockMvc.perform(get("/api/pet/list")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.length()").value(3))
+      .andExpect(jsonPath("$.data[2].name").value("Momo"));
+  }
+
+  @Test
+  void updatePetPartiallyPreservesOmittedFields() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(put("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Nuomi Updated",
+            "weight": 4.80
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.name").value("Nuomi Updated"))
+      .andExpect(jsonPath("$.data.species").value("CAT"))
+      .andExpect(jsonPath("$.data.breed").value("British Shorthair"))
+      .andExpect(jsonPath("$.data.gender").value("FEMALE"))
+      .andExpect(jsonPath("$.data.weight").value(4.8));
+
+    mockMvc.perform(get("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.name").value("Nuomi Updated"))
+      .andExpect(jsonPath("$.data.species").value("CAT"))
+      .andExpect(jsonPath("$.data.breed").value("British Shorthair"));
+  }
+
+  @Test
+  void updatePetRejectsBlankRequiredField() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(put("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "   "
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_PET_FIELD"));
+  }
+
+  @Test
+  void petMutationRejectsInvalidDateAndWeight() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/pet")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Bad Date",
+            "species": "CAT",
+            "gender": "FEMALE",
+            "birthday": "2026-99-99"
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_PET_FIELD"));
+
+    mockMvc.perform(post("/api/pet")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Bad Weight",
+            "species": "DOG",
+            "gender": "MALE",
+            "weight": -1
+          }
+          """))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_PET_FIELD"));
+  }
+
+  @Test
+  void deletePetSoftDeletesAndHidesPetFromReads() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(delete("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"));
+
+    mockMvc.perform(get("/api/pet/list")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.length()").value(1))
+      .andExpect(jsonPath("$.data[0].id").value(2));
+
+    mockMvc.perform(get("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+
+    mockMvc.perform(delete("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+  }
+
+  @Test
+  void petWritesRejectNonOwnedPetAsNotFound() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000002", "123456");
+
+    mockMvc.perform(get("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+
+    mockMvc.perform(put("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Not Mine"
+          }
+          """))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+
+    mockMvc.perform(delete("/api/pet/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+
+    mockMvc.perform(post("/api/pet/1/health")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "recordType": "CHECKUP",
+            "title": "Wrong owner",
+            "recordDate": "2026-04-01"
+          }
+          """))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+
+    mockMvc.perform(post("/api/pet/1/vaccine")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "vaccineName": "Wrong owner vaccine",
+            "vaccinatedAt": "2026-04-01"
+          }
+          """))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("PET_NOT_FOUND"));
+  }
+
+  @Test
+  void healthRecordCreationPersistsAndSortsByDateThenIdDescending() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/pet/1/health")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "recordType": "CHECKUP",
+            "title": "Morning check",
+            "description": "Stable",
+            "recordDate": "2026-04-01",
+            "nextDate": "2026-05-01"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.title").value("Morning check"));
+
+    mockMvc.perform(post("/api/pet/1/health")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "recordType": "MEDICATION",
+            "title": "Evening medication",
+            "description": "Completed",
+            "recordDate": "2026-04-01",
+            "nextDate": "2026-05-01"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.title").value("Evening medication"));
+
+    mockMvc.perform(get("/api/pet/1/health")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data[0].title").value("Evening medication"))
+      .andExpect(jsonPath("$.data[1].title").value("Morning check"));
+  }
+
+  @Test
+  void vaccineCreationPersistsAndSortsByDateThenIdDescending() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/pet/1/vaccine")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "vaccineName": "First same day",
+            "vaccinatedAt": "2026-08-01",
+            "nextDueAt": "2027-08-01",
+            "hospital": "Cloud Vet Center"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.vaccineName").value("First same day"));
+
+    mockMvc.perform(post("/api/pet/1/vaccine")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "vaccineName": "Second same day",
+            "vaccinatedAt": "2026-08-01",
+            "nextDueAt": "2027-08-01",
+            "hospital": "Cloud Vet Center"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.vaccineName").value("Second same day"));
+
+    mockMvc.perform(get("/api/pet/1/vaccine")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data[0].vaccineName").value("Second same day"))
+      .andExpect(jsonPath("$.data[1].vaccineName").value("First same day"));
+  }
   @Test
   void appointmentListReturnsOnlyCurrentUserAppointments() throws Exception {
     String accessToken = loginAndGetAccessToken("13800000001", "123456");

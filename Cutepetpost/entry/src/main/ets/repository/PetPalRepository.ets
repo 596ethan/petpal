@@ -1,9 +1,13 @@
-﻿import common from '@ohos.app.ability.common';
+import common from '@ohos.app.ability.common';
 import http from '@ohos.net.http';
 import {
   Appointment,
   AppointmentStatus,
   CommentItem,
+  HealthRecordCreateInput,
+  PetCreateInput,
+  PetUpdateInput,
+  VaccineRecordCreateInput,
   HealthRecord,
   Pet,
   PetGender,
@@ -66,21 +70,31 @@ interface BackendPet {
   id: number;
   name: string;
   species: string;
-  breed: string;
+  breed?: string;
   gender: string;
-  birthday: string;
-  weight: number;
-  avatarUrl: string;
+  birthday?: string | null;
+  weight?: number | null;
+  avatarUrl?: string | null;
   neutered: boolean;
 }
 
 interface BackendHealthRecord {
   id: number;
+  recordType: string;
   title: string;
-  description: string;
+  description?: string | null;
   recordDate: string;
-  nextDate: string;
+  nextDate?: string | null;
 }
+
+interface BackendVaccineRecord {
+  id: number;
+  vaccineName: string;
+  vaccinatedAt: string;
+  nextDueAt?: string | null;
+  hospital?: string | null;
+}
+
 
 interface BackendProvider {
   id: number;
@@ -310,20 +324,68 @@ export class PetPalRepository {
 
   static async getHealthRecordsAsync(petId: number): Promise<HealthRecord[]> {
     const payload = await PetPalRepository.request<BackendHealthRecord[]>(`/pet/${petId}/health`, http.RequestMethod.GET);
-    return payload.map((item: BackendHealthRecord) => {
-      const record: HealthRecord = {
-        id: item.id,
-        title: item.title,
-        summary: item.description,
-        recordDate: item.recordDate,
-        nextDate: item.nextDate
-      };
-      return record;
-    });
+    return payload.map((item: BackendHealthRecord) => ({
+      id: item.id,
+      title: item.title,
+      summary: item.description ?? "",
+      recordDate: item.recordDate,
+      nextDate: item.nextDate ?? ""
+    }));
+  }
+
+  static async createPet(input: PetCreateInput): Promise<Pet> {
+    const payload = await PetPalRepository.request<BackendPet>(`/pet`, http.RequestMethod.POST, input);
+    return PetPalRepository.mapPet(payload);
+  }
+
+  static async updatePet(petId: number, input: PetUpdateInput): Promise<Pet> {
+    const payload = await PetPalRepository.request<BackendPet>(`/pet/${petId}`, http.RequestMethod.PUT, input);
+    return PetPalRepository.mapPet(payload);
+  }
+
+  static async deletePet(petId: number): Promise<void> {
+    await PetPalRepository.request<void>(`/pet/${petId}`, http.RequestMethod.DELETE);
+  }
+
+  static async addHealthRecord(petId: number, input: HealthRecordCreateInput): Promise<HealthRecord> {
+    const payload = await PetPalRepository.request<BackendHealthRecord>(`/pet/${petId}/health`, http.RequestMethod.POST, input);
+    return {
+      id: payload.id,
+      title: payload.title,
+      summary: payload.description ?? "",
+      recordDate: payload.recordDate,
+      nextDate: payload.nextDate ?? ""
+    };
+  }
+
+  static async getVaccineRecords(petId: number): Promise<VaccineRecord[]> {
+    const payload = await PetPalRepository.request<BackendVaccineRecord[]>(`/pet/${petId}/vaccine`, http.RequestMethod.GET);
+    return payload.map((item: BackendVaccineRecord) => ({
+      id: item.id,
+      vaccineName: item.vaccineName,
+      vaccinatedAt: item.vaccinatedAt,
+      nextDueAt: item.nextDueAt ?? "",
+      hospital: item.hospital ?? ""
+    }));
+  }
+
+  static async getVaccineRecordsAsync(petId: number): Promise<VaccineRecord[]> {
+    return PetPalRepository.getVaccineRecords(petId);
+  }
+
+  static async addVaccineRecord(petId: number, input: VaccineRecordCreateInput): Promise<VaccineRecord> {
+    const payload = await PetPalRepository.request<BackendVaccineRecord>(`/pet/${petId}/vaccine`, http.RequestMethod.POST, input);
+    return {
+      id: payload.id,
+      vaccineName: payload.vaccineName,
+      vaccinatedAt: payload.vaccinatedAt,
+      nextDueAt: payload.nextDueAt ?? "",
+      hospital: payload.hospital ?? ""
+    };
   }
 
   static async getVaccinesAsync(petId: number): Promise<VaccineRecord[]> {
-    return PetPalRepository.request<VaccineRecord[]>(`/pet/${petId}/vaccine`, http.RequestMethod.GET);
+    return PetPalRepository.getVaccineRecords(petId);
   }
 
   static async getProvidersRemote(): Promise<ServiceProvider[]> {
@@ -567,11 +629,11 @@ export class PetPalRepository {
       id: item.id,
       name: item.name,
       species: PetPalRepository.mapSpecies(item.species),
-      breed: item.breed,
+      breed: item.breed ?? "",
       gender: PetPalRepository.mapGender(item.gender),
-      birthday: item.birthday,
-      weight: `${item.weight}`,
-      avatarUrl: item.avatarUrl,
+      birthday: item.birthday ?? "",
+      weight: item.weight === undefined || item.weight === null ? "" : `${item.weight}`,
+      avatarUrl: item.avatarUrl ?? "",
       neutered: item.neutered
     };
     return result;
@@ -692,5 +754,3 @@ export class PetPalRepository {
     return AppointmentStatus.PENDING_CONFIRM;
   }
 }
-
-

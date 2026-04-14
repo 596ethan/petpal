@@ -1,6 +1,6 @@
 # PetPal Phone MVP Slices
 
-This document defines the first three implementation slices required by `AGENTS.md`.
+This document defines the implementation slices required by `AGENTS.md`.
 
 ## Slice 1: Password Login
 
@@ -128,3 +128,88 @@ A phone user selects a provider service and pet, chooses a time, adds an optiona
 - phone: submit success path
 - phone: cancel success path
 - phone: cancel failure messaging
+
+## Slice 4: Pet Archive P0
+
+### User goal
+A phone user can maintain the core pet archive lifecycle: create a pet profile, update pet information, delete a pet profile, add health records, view health records, and add vaccine records.
+
+### Entry screen
+- `Cutepetpost/entry/src/main/ets/pages/Index.ets`
+- `Cutepetpost/entry/src/main/ets/pages/PetDetail.ets`
+- follow-up phone pet form screen or in-page form to be added during implementation
+
+### API contract
+- All pet archive P0 endpoints require phone auth with `Authorization: Bearer <accessToken>`.
+- `POST /api/pet`
+  - Request:
+    - `name: string`
+    - `species: "DOG" | "CAT" | "RABBIT" | "BIRD" | "OTHER"`
+    - `breed?: string`
+    - `gender: "MALE" | "FEMALE" | "UNKNOWN"`
+    - `birthday?: string` in `yyyy-MM-dd`
+    - `weight?: number` in kg
+    - `avatarUrl?: string`
+    - `neutered?: boolean`
+  - Success:
+    - created pet profile owned by the current user
+- `PUT /api/pet/{petId}`
+  - Partial update. Fields not present in the request keep their existing values.
+  - If a field is present, the backend validates it.
+  - Required fields cannot be updated to blank strings.
+- `DELETE /api/pet/{petId}`
+  - Soft deletes the pet profile.
+  - Does not hard-delete health records, vaccine records, or historical appointments.
+- `GET /api/pet/list`
+  - Returns only current user's non-deleted pets.
+- `GET /api/pet/{petId}`
+  - Returns the current user's non-deleted pet profile.
+- `POST /api/pet/{petId}/health`
+  - Request:
+    - `recordType: "VACCINE" | "CHECKUP" | "MEDICATION" | "SURGERY"`
+    - `title: string`
+    - `description?: string`
+    - `recordDate: string` in `yyyy-MM-dd`
+    - `nextDate?: string` in `yyyy-MM-dd`
+- `GET /api/pet/{petId}/health`
+  - Returns records ordered by `recordDate desc, id desc`.
+- `POST /api/pet/{petId}/vaccine`
+  - Request:
+    - `vaccineName: string`
+    - `vaccinatedAt: string` in `yyyy-MM-dd`
+    - `nextDueAt?: string` in `yyyy-MM-dd`
+    - `hospital?: string`
+- `GET /api/pet/{petId}/vaccine`
+  - Returns records ordered by `vaccinatedAt desc, id desc`.
+
+### Success state
+- Creating a pet persists it to the backend and refreshes the phone pet list.
+- Partial update changes only submitted fields and preserves omitted fields.
+- Deleting a pet removes it from the phone pet list and returns the user to the previous screen with a success message.
+- Adding a health record persists it and the health timeline refreshes in backend sort order.
+- Adding a vaccine record persists it and the vaccine list refreshes in backend sort order.
+
+### Failure state
+- Missing required fields, invalid dates, and invalid weight return clear 400 responses.
+- Non-existent, non-owned, or deleted pets return `404` with code `PET_NOT_FOUND` for detail, update, delete, health create, and vaccine create.
+- Deleted pets are not returned by `GET /api/pet/list`.
+- Phone client shows visible loading, empty, error, and not found states.
+- Phone client must not silently fall back to mock data for pet archive P0 failures.
+
+### Test cases
+- backend: pet creation persists and appears in current user's pet list
+- backend: partial update preserves omitted fields
+- backend: partial update rejects blank required fields
+- backend: delete soft-deletes the pet and removes it from list
+- backend: deleted pet detail/update/delete/health create/vaccine create return `PET_NOT_FOUND`
+- backend: non-owned pet detail/update/delete/health create/vaccine create return `PET_NOT_FOUND`
+- backend: health record creation persists and list returns `recordDate desc, id desc`
+- backend: vaccine record creation persists and list returns `vaccinatedAt desc, id desc`
+- phone repository: create/update/delete/add health/add vaccine use the locked paths, methods, auth headers, and bodies
+- phone repository: backend errors are surfaced without mock fallback
+- phone: create success path
+- phone: update success path
+- phone: delete success path with return, list refresh, and "已删除" message
+- phone: health record add success path
+- phone: vaccine record add success path
+- phone: deleted pet detail shows a not found state

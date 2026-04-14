@@ -91,6 +91,92 @@ Service data includes:
 }
 ```
 
+## Pet Archive P0
+
+Implemented:
+
+- `POST /api/pet`
+- `GET /api/pet/list`
+- `GET /api/pet/{petId}`
+- `PUT /api/pet/{petId}`
+- `DELETE /api/pet/{petId}`
+- `POST /api/pet/{petId}/health`
+- `GET /api/pet/{petId}/health`
+- `POST /api/pet/{petId}/vaccine`
+- `GET /api/pet/{petId}/vaccine`
+
+All pet archive endpoints require phone auth.
+
+Pet create request:
+
+```json
+{
+  "name": "Momo",
+  "species": "RABBIT",
+  "breed": "Mini Rex",
+  "gender": "UNKNOWN",
+  "birthday": "2024-02-03",
+  "weight": 2.4,
+  "avatarUrl": "https://placehold.co/120x120?text=momo",
+  "neutered": false
+}
+```
+
+Pet data includes:
+
+```json
+{
+  "id": 3,
+  "name": "Momo",
+  "species": "RABBIT",
+  "breed": "Mini Rex",
+  "gender": "UNKNOWN",
+  "birthday": "2024-02-03",
+  "weight": 2.4,
+  "avatarUrl": "https://placehold.co/120x120?text=momo",
+  "neutered": false
+}
+```
+
+`PUT /api/pet/{petId}` uses partial update semantics. Omitted fields keep their existing values. Present fields are validated, and required fields cannot be updated to blank strings.
+
+`DELETE /api/pet/{petId}` soft-deletes the pet by setting `deleted = 1`. Deleted pets are not returned by `GET /api/pet/list` and return `404` with code `PET_NOT_FOUND` for detail, update, delete, health create, and vaccine create.
+
+Health record create request:
+
+```json
+{
+  "recordType": "CHECKUP",
+  "title": "Morning check",
+  "description": "Stable",
+  "recordDate": "2026-04-01",
+  "nextDate": "2026-05-01"
+}
+```
+
+Health record list ordering is `recordDate desc, id desc`.
+
+Vaccine record create request:
+
+```json
+{
+  "vaccineName": "Rabies",
+  "vaccinatedAt": "2026-08-01",
+  "nextDueAt": "2027-08-01",
+  "hospital": "Cloud Vet Center"
+}
+```
+
+Vaccine record list ordering is `vaccinatedAt desc, id desc`.
+
+Implemented validation:
+
+- Missing required create fields return `400` with code `BAD_REQUEST`.
+- Invalid pet field values, including invalid date and invalid weight, return `400` with code `INVALID_PET_FIELD`.
+- Invalid health record field values return `400` with code `INVALID_HEALTH_RECORD_FIELD`.
+- Invalid vaccine record field values return `400` with code `INVALID_VACCINE_RECORD_FIELD`.
+- Non-existent, non-owned, or deleted pets return `404` with code `PET_NOT_FOUND` for pet archive P0 operations.
+
 ## Appointments
 
 Implemented:

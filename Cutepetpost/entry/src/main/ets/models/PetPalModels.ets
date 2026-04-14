@@ -47,6 +47,28 @@ export interface Pet {
   neutered: boolean
 }
 
+export interface PetCreateInput {
+  name: string
+  species: PetSpecies
+  breed?: string
+  gender: PetGender
+  birthday?: string
+  weight?: number
+  avatarUrl?: string
+  neutered?: boolean
+}
+
+export interface PetUpdateInput {
+  name?: string
+  species?: PetSpecies
+  breed?: string
+  gender?: PetGender
+  birthday?: string
+  weight?: number
+  avatarUrl?: string
+  neutered?: boolean
+}
+
 export interface HealthRecord {
   id: number
   title: string
@@ -55,12 +77,27 @@ export interface HealthRecord {
   nextDate: string
 }
 
+export interface HealthRecordCreateInput {
+  recordType: string
+  title: string
+  description?: string
+  recordDate: string
+  nextDate?: string
+}
+
 export interface VaccineRecord {
   id: number
   vaccineName: string
   vaccinatedAt: string
   nextDueAt: string
   hospital: string
+}
+
+export interface VaccineRecordCreateInput {
+  vaccineName: string
+  vaccinatedAt: string
+  nextDueAt?: string
+  hospital?: string
 }
 
 export interface Post {

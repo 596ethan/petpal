@@ -1,6 +1,9 @@
-﻿import {
+import {
   Appointment,
   Pet,
+  PetCreateInput,
+  PetGender,
+  PetSpecies,
   Post,
   ServiceProvider,
   UserProfile
@@ -62,6 +65,30 @@ function SoftAvatar(label: string, backgroundColor: string, fontColor: string, s
     .padding({ top: size > 40 ? 10 : 8 })
 }
 
+interface PetSpeciesOption {
+  value: PetSpecies
+  label: string
+}
+
+interface PetGenderOption {
+  value: PetGender
+  label: string
+}
+
+const PET_SPECIES_OPTIONS: PetSpeciesOption[] = [
+  { value: PetSpecies.CAT, label: '猫咪' },
+  { value: PetSpecies.DOG, label: '狗狗' },
+  { value: PetSpecies.RABBIT, label: '兔兔' },
+  { value: PetSpecies.BIRD, label: '鸟类' },
+  { value: PetSpecies.OTHER, label: '其他' }
+]
+
+const PET_GENDER_OPTIONS: PetGenderOption[] = [
+  { value: PetGender.FEMALE, label: '母' },
+  { value: PetGender.MALE, label: '公' },
+  { value: PetGender.UNKNOWN, label: '未知' }
+]
+
 const EMPTY_USER: UserProfile = {
   id: 0,
   nickname: '',
@@ -82,8 +109,24 @@ struct Index {
   @State appointments: Appointment[] = []
   @State isAuthenticated: boolean = PetPalRepository.getSession() !== null
   @State refreshError: string = ''
+  @State petArchiveMessage: string = ''
+  @State petArchiveError: string = ''
+  @State petCreateVisible: boolean = false
+  @State creatingPet: boolean = false
+  @State createPetName: string = ''
+  @State createPetSpecies: PetSpecies = PetSpecies.CAT
+  @State createPetBreed: string = ''
+  @State createPetGender: PetGender = PetGender.UNKNOWN
+  @State createPetBirthday: string = ''
+  @State createPetWeight: string = ''
+  @State createPetAvatarUrl: string = ''
+  @State createPetNeutered: boolean = false
 
   aboutToAppear() {
+    void this.refreshData()
+  }
+
+  onPageShow() {
     void this.refreshData()
   }
 
@@ -120,6 +163,77 @@ struct Index {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.refreshError = `取消预约失败：${message}`
+    }
+  }
+
+  private optionalPositiveNumber(value: string, label: string): number | undefined {
+    const trimmed = value.trim()
+    if (trimmed.length === 0) {
+      return undefined
+    }
+    const parsed = Number(trimmed)
+    if (parsed !== parsed || parsed <= 0) {
+      throw new Error(`${label}请输入大于 0 的数字`)
+    }
+    return parsed
+  }
+
+  private resetCreatePetForm(): void {
+    this.createPetName = ''
+    this.createPetSpecies = PetSpecies.CAT
+    this.createPetBreed = ''
+    this.createPetGender = PetGender.UNKNOWN
+    this.createPetBirthday = ''
+    this.createPetWeight = ''
+    this.createPetAvatarUrl = ''
+    this.createPetNeutered = false
+  }
+
+  private async submitCreatePet(): Promise<void> {
+    if (this.creatingPet) {
+      return
+    }
+    const name = this.createPetName.trim()
+    if (name.length === 0) {
+      this.petArchiveError = '请输入宠物名称'
+      return
+    }
+    try {
+      this.creatingPet = true
+      this.petArchiveError = ''
+      this.petArchiveMessage = ''
+      const input: PetCreateInput = {
+        name: name,
+        species: this.createPetSpecies,
+        gender: this.createPetGender,
+        neutered: this.createPetNeutered
+      }
+      const breed = this.createPetBreed.trim()
+      const birthday = this.createPetBirthday.trim()
+      const avatarUrl = this.createPetAvatarUrl.trim()
+      const weight = this.optionalPositiveNumber(this.createPetWeight, '体重')
+      if (breed.length > 0) {
+        input.breed = breed
+      }
+      if (birthday.length > 0) {
+        input.birthday = birthday
+      }
+      if (weight !== undefined) {
+        input.weight = weight
+      }
+      if (avatarUrl.length > 0) {
+        input.avatarUrl = avatarUrl
+      }
+      await PetPalRepository.createPet(input)
+      this.resetCreatePetForm()
+      this.petCreateVisible = false
+      this.petArchiveMessage = '宠物档案已创建'
+      await this.refreshData()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.petArchiveError = `创建宠物档案失败：${message}`
+    } finally {
+      this.creatingPet = false
     }
   }
 
@@ -289,6 +403,37 @@ struct Index {
           }
           .width('100%')
           SectionLead('我的宠物档案', '每一只都有独立的照护叙事', '把体重、生日、绝育与提醒汇总成更有身份感的档案卡。')
+          if (this.petArchiveMessage.length > 0) {
+            Text(this.petArchiveMessage)
+              .fontSize(12)
+              .fontColor(PetPalTheme.success)
+              .width('100%')
+              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+              .backgroundColor(PetPalTheme.successSoft)
+              .borderRadius(16)
+          }
+          if (this.petArchiveError.length > 0) {
+            Text(this.petArchiveError)
+              .fontSize(12)
+              .fontColor(PetPalTheme.danger)
+              .width('100%')
+              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+              .backgroundColor(PetPalTheme.dangerSoft)
+              .borderRadius(16)
+          }
+          Button(this.petCreateVisible ? '收起新建档案' : '新建宠物档案')
+            .height(42)
+            .fontSize(13)
+            .fontColor('#FFFFFF')
+            .backgroundColor(PetPalTheme.primary)
+            .borderRadius(PetPalTheme.radiusChip)
+            .onClick(() => {
+              this.petCreateVisible = !this.petCreateVisible
+              this.petArchiveError = ''
+            })
+          if (this.petCreateVisible) {
+            this.PetCreateForm()
+          }
           if (this.pets.length > 0) {
             ForEach(this.pets, (item: Pet) => {
               this.PetArchiveCard(item)
@@ -300,6 +445,110 @@ struct Index {
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 120 })
     }
+  }
+
+  @Builder
+  PetCreateForm() {
+    Column({ space: 12 }) {
+      Text('新建宠物档案')
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PetPalTheme.text)
+      TextInput({ text: this.createPetName, placeholder: '宠物名称，必填' })
+        .height(50)
+        .backgroundColor(PetPalTheme.surface)
+        .borderRadius(PetPalTheme.radiusImage)
+        .padding({ left: 12, right: 12 })
+        .onChange((value: string) => {
+          this.createPetName = value
+        })
+      TextInput({ text: this.createPetBreed, placeholder: '品种，可选' })
+        .height(50)
+        .backgroundColor(PetPalTheme.surface)
+        .borderRadius(PetPalTheme.radiusImage)
+        .padding({ left: 12, right: 12 })
+        .onChange((value: string) => {
+          this.createPetBreed = value
+        })
+      Row({ space: 8 }) {
+        ForEach(PET_SPECIES_OPTIONS, (option: PetSpeciesOption) => {
+          Button(option.label)
+            .height(34)
+            .fontSize(12)
+            .fontColor(this.createPetSpecies === option.value ? '#FFFFFF' : PetPalTheme.text)
+            .backgroundColor(this.createPetSpecies === option.value ? PetPalTheme.primary : PetPalTheme.surfaceWarm)
+            .borderRadius(PetPalTheme.radiusChip)
+            .onClick(() => {
+              this.createPetSpecies = option.value
+            })
+        })
+      }
+      Row({ space: 8 }) {
+        ForEach(PET_GENDER_OPTIONS, (option: PetGenderOption) => {
+          Button(option.label)
+            .height(34)
+            .fontSize(12)
+            .fontColor(this.createPetGender === option.value ? '#FFFFFF' : PetPalTheme.text)
+            .backgroundColor(this.createPetGender === option.value ? PetPalTheme.accent : PetPalTheme.accentSoft)
+            .borderRadius(PetPalTheme.radiusChip)
+            .onClick(() => {
+              this.createPetGender = option.value
+            })
+        })
+      }
+      Row({ space: 10 }) {
+        TextInput({ text: this.createPetBirthday, placeholder: '生日 yyyy-MM-dd，可选' })
+          .height(50)
+          .backgroundColor(PetPalTheme.surface)
+          .borderRadius(PetPalTheme.radiusImage)
+          .padding({ left: 12, right: 12 })
+          .layoutWeight(1)
+          .onChange((value: string) => {
+            this.createPetBirthday = value
+          })
+        TextInput({ text: this.createPetWeight, placeholder: '体重 kg，可选' })
+          .height(50)
+          .backgroundColor(PetPalTheme.surface)
+          .borderRadius(PetPalTheme.radiusImage)
+          .padding({ left: 12, right: 12 })
+          .layoutWeight(1)
+          .onChange((value: string) => {
+            this.createPetWeight = value
+          })
+      }
+      TextInput({ text: this.createPetAvatarUrl, placeholder: '头像 URL，可选' })
+        .height(50)
+        .backgroundColor(PetPalTheme.surface)
+        .borderRadius(PetPalTheme.radiusImage)
+        .padding({ left: 12, right: 12 })
+        .onChange((value: string) => {
+          this.createPetAvatarUrl = value
+        })
+      Button(this.createPetNeutered ? '已绝育' : '未绝育')
+        .height(38)
+        .fontSize(12)
+        .fontColor(this.createPetNeutered ? '#FFFFFF' : PetPalTheme.text)
+        .backgroundColor(this.createPetNeutered ? PetPalTheme.success : PetPalTheme.warningSoft)
+        .borderRadius(PetPalTheme.radiusChip)
+        .onClick(() => {
+          this.createPetNeutered = !this.createPetNeutered
+        })
+      Button(this.creatingPet ? '保存中...' : '保存宠物档案')
+        .width('100%')
+        .height(48)
+        .fontSize(14)
+        .fontColor('#FFFFFF')
+        .backgroundColor(PetPalTheme.text)
+        .borderRadius(PetPalTheme.radiusChip)
+        .onClick(() => {
+          void this.submitCreatePet()
+        })
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(PetPalTheme.surfaceRaised)
+    .borderRadius(PetPalTheme.radiusPanel)
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -862,22 +1111,26 @@ struct Index {
   PetArchiveCard(item: Pet) {
     Row({ space: 14 }) {
       Column({ space: 10 }) {
-        Image(item.avatarUrl)
-          .width(54)
-          .height(54)
-          .objectFit(ImageFit.Cover)
-          .borderRadius(27)
+        if (item.avatarUrl.length > 0) {
+          Image(item.avatarUrl)
+            .width(54)
+            .height(54)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(27)
+        } else {
+          SoftAvatar(item.name.length > 0 ? item.name.substring(0, 1) : '宠', PetPalTheme.primarySoft, PetPalTheme.primary, 54)
+        }
       }
       Column({ space: 8 }) {
         Text(item.name)
           .fontSize(21)
           .fontWeight(FontWeight.Bold)
           .fontColor(PetPalTheme.text)
-        Text(`${speciesText(item.species)} · ${item.breed} · ${genderText(item.gender)}`)
+        Text(`${speciesText(item.species)} · ${item.breed.length > 0 ? item.breed : '未填写品种'} · ${genderText(item.gender)}`)
           .fontSize(13)
           .fontColor(PetPalTheme.textMuted)
         Row({ space: 8 }) {
-          CapsuleChip(`生日 ${item.birthday}`, PetPalTheme.surfaceWarm, PetPalTheme.textMuted)
+          CapsuleChip(item.birthday.length > 0 ? `生日 ${item.birthday}` : '生日未填写', PetPalTheme.surfaceWarm, PetPalTheme.textMuted)
           CapsuleChip(item.neutered ? '已绝育' : '未绝育', item.neutered ? PetPalTheme.successSoft : PetPalTheme.warningSoft, item.neutered ? PetPalTheme.success : PetPalTheme.warning)
         }
         Button('查看健康档案')
