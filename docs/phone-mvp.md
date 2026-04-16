@@ -213,3 +213,108 @@ A phone user can maintain the core pet archive lifecycle: create a pet profile, 
 - phone: health record add success path
 - phone: vaccine record add success path
 - phone: deleted pet detail shows a not found state
+
+## Slice 5: Community P0
+
+### User goal
+A logged-in phone user can publish a community post, attach uploaded images, like or unlike posts, publish root comments, view comment lists, and delete their own posts.
+
+### Entry screen
+- `Cutepetpost/entry/src/main/ets/pages/Index.ets`
+- `Cutepetpost/entry/src/main/ets/pages/PostDetail.ets`
+
+### API contract
+- Community P0 write endpoints require phone auth with `Authorization: Bearer <accessToken>`.
+- Feed/detail/comment reads are public, but when a valid token is present the backend returns the current user's `liked` state.
+- `POST /api/post`
+  - Request:
+    - `content: string`
+    - `petId?: number`
+    - `imageUrls?: string[]`, maximum 9
+  - Success:
+    - created public post owned by the current user
+    - returned `PostDto` includes `id`, `userId`, `userNickname`, `userAvatarUrl`, `petId`, `petName`, `content`, `imageUrls`, `topics`, `visibility`, `likeCount`, `commentCount`, `liked`, `createdAt`
+- `DELETE /api/post/{postId}`
+  - Success:
+    - soft deletes the current user's post
+- `POST /api/post/{postId}/like`
+  - Success:
+    - idempotently records the current user's like
+- `DELETE /api/post/{postId}/like`
+  - Success:
+    - idempotently removes the current user's like
+- `POST /api/post/{postId}/comment`
+  - Request:
+    - `content: string`
+  - Success:
+    - created root comment owned by the current user
+    - returned `PostCommentDto` includes `id`, `parentId`, `userId`, `userNickname`, `content`, `createdAt`
+- `GET /api/post/{postId}/comment`
+  - Returns root comments ordered by `created_at asc, id asc`.
+- `POST /api/file/upload`
+  - Request:
+    - multipart form-data field `file`
+  - Success:
+    - `fileKey: string`
+    - `url: string`
+  - Failure:
+    - non-image files return `400 INVALID_FILE_TYPE`
+    - oversized files return `400 FILE_TOO_LARGE`
+    - missing file returns `400 FILE_REQUIRED`
+    - storage failure returns `500 FILE_UPLOAD_FAILED`
+
+### Success state
+- Publishing a post persists it and refreshes the community feed.
+- Uploaded images are stored through `/api/file/upload` and associated with the created post.
+- Liking and unliking update `liked` and `likeCount` from backend state.
+- Publishing a comment persists it, refreshes the comment list, and updates `commentCount`.
+- Deleting the current user's post removes it from feed and makes detail/comment reads return not found.
+
+### Loading, empty, error, not-found, and submitting states
+- Feed and detail loads show visible loading state.
+- Empty feed and empty comment list show designed empty states.
+- Request failures show visible error messages.
+- Missing or deleted post detail shows a not-found state.
+- Publish, delete, like, unlike, comment, and upload actions show submitting state and do not allow duplicate taps while submitting.
+- Phone client must not silently fall back to mock data for Community P0 failures.
+
+### Community P0 rules
+- Comment scope: Community P0 only supports root comments. It does not support comment replies, comment deletion, or comment likes.
+- Soft delete visibility: deleted posts do not appear in feed; detail, delete, like, unlike, comment create, and comment list for a deleted post return `404 POST_NOT_FOUND`.
+- Like consistency: `post_like` has a unique constraint on `(post_id, user_id)`; like and unlike are idempotent; `likeCount` is maintained from backend state and is not corrected by frontend-only increments.
+- Upload prerequisite: Phone UI must not wire a fake upload flow. Publishing-page image upload may be wired only after `/api/file/upload` multipart contract, MinIO configuration, and error codes are stable.
+
+### Out of scope
+- Comment replies
+- Comment deletion
+- Comment likes
+- Post editing
+- Search
+- Recommendations
+- Notifications
+- Moderation/admin community workflows
+- Third-party media processing
+
+### Test cases
+- backend: unauthenticated community writes are rejected
+- backend: post creation persists current `userId`, validates non-blank content, validates owned optional `petId`, and stores up to 9 images
+- backend: feed excludes deleted posts and returns `imageUrls`, `liked`, `likeCount`, and `commentCount`
+- backend: detail for deleted or missing posts returns `POST_NOT_FOUND`
+- backend: only the author can delete a post; non-author delete returns `POST_NOT_FOUND`
+- backend: like is idempotent and uses the `(post_id, user_id)` unique constraint
+- backend: unlike is idempotent and never makes `likeCount` negative
+- backend: comment creation persists a root comment and increments `commentCount`
+- backend: comments for a post return `created_at asc, id asc`
+- backend: deleted post detail/delete/like/unlike/comment create/comment list return `POST_NOT_FOUND`
+- backend: upload rejects missing, non-image, and oversized files with stable error codes
+- backend: upload stores a valid image and returns `fileKey` and `url`
+- phone repository: create/delete/like/unlike/comment/upload use the locked paths, methods, auth headers, and bodies
+- phone repository: community read requests include auth when a session exists
+- phone repository: backend errors are surfaced without mock fallback
+- phone: publish post success path
+- phone: image upload success path before publish
+- phone: like/unlike success path
+- phone: author delete success path
+- phone: comment create and list success path
+- phone: loading, empty, error, not-found, and submitting states
+- e2e: after login, publish a post with an uploaded image, see it in feed, like and unlike it, open detail, publish a root comment, see it in the comment list, delete the post, and verify feed/detail/comment list no longer expose it
