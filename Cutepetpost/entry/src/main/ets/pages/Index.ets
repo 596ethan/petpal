@@ -1,13 +1,17 @@
 import {
   Appointment,
+  FileUploadInput,
   Pet,
   PetCreateInput,
   PetGender,
   PetSpecies,
   Post,
+  PostCreateInput,
   ServiceProvider,
   UserProfile
 } from '../models/PetPalModels';
+import fs from '@ohos.file.fs';
+import photoAccessHelper from '@ohos.file.photoAccessHelper';
 import { PetPalRepository } from '../repository/PetPalRepository';
 import {
   PetPalTheme,
@@ -109,6 +113,16 @@ struct Index {
   @State appointments: Appointment[] = []
   @State isAuthenticated: boolean = PetPalRepository.getSession() !== null
   @State refreshError: string = ''
+  @State refreshing: boolean = false
+  @State communityMessage: string = ''
+  @State communityError: string = ''
+  @State postComposerVisible: boolean = false
+  @State postSubmitting: boolean = false
+  @State postUploading: boolean = false
+  @State postActionId: number = 0
+  @State postContent: string = ''
+  @State postPetIdText: string = ''
+  @State postImageUrls: string[] = []
   @State petArchiveMessage: string = ''
   @State petArchiveError: string = ''
   @State petCreateVisible: boolean = false
@@ -132,9 +146,10 @@ struct Index {
 
   private async refreshData() {
     try {
+      this.refreshing = true
       this.refreshError = ''
       const remotePosts = await PetPalRepository.getPostsAsync()
-      this.posts = remotePosts.length > 0 ? remotePosts : PetPalRepository.getPosts()
+      this.posts = remotePosts
       this.providers = await PetPalRepository.getProvidersAsync()
       if (PetPalRepository.getSession() === null) {
         this.isAuthenticated = false
@@ -152,7 +167,10 @@ struct Index {
       this.appointments = remoteAppointments
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      this.communityError = message
       this.refreshError = `内容刷新失败：${message}`
+    } finally {
+      this.refreshing = false
     }
   }
 
@@ -234,6 +252,168 @@ struct Index {
       this.petArchiveError = `创建宠物档案失败：${message}`
     } finally {
       this.creatingPet = false
+    }
+  }
+
+  private resetPostComposer(): void {
+    this.postContent = ''
+    this.postPetIdText = ''
+    this.postImageUrls = []
+  }
+
+  private async pickPostImages(): Promise<void> {
+    if (!this.isAuthenticated) {
+      this.communityError = 'Please log in before uploading images.'
+      return
+    }
+    if (this.postUploading || this.postImageUrls.length >= 9) {
+      return
+    }
+    try {
+      this.postUploading = true
+      this.communityError = ''
+      const options = new photoAccessHelper.PhotoSelectOptions()
+      options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE
+      options.maxSelectNumber = 9 - this.postImageUrls.length
+      const picker = new photoAccessHelper.PhotoViewPicker()
+      const result = await picker.select(options)
+      for (const uri of result.photoUris) {
+        if (this.postImageUrls.length >= 9) {
+          break
+        }
+        const uploadInput = this.uploadInputFromUri(uri)
+        const uploaded = await PetPalRepository.uploadPostImage(uploadInput)
+        this.postImageUrls = this.postImageUrls.concat([uploaded.url])
+      }
+      if (this.postImageUrls.length > 0) {
+        this.communityMessage = 'Image uploaded.'
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.communityError = `Image upload failed: ${message}`
+    } finally {
+      this.postUploading = false
+    }
+  }
+
+  private uploadInputFromUri(uri: string): FileUploadInput {
+    const file = fs.openSync(uri, fs.OpenMode.READ_ONLY)
+    try {
+      const stat = fs.statSync(file.fd)
+      const data = new ArrayBuffer(stat.size)
+      fs.readSync(file.fd, data)
+      return {
+        fileName: this.fileNameFromUri(uri),
+        contentType: this.contentTypeFromUri(uri),
+        data: data
+      }
+    } finally {
+      fs.closeSync(file)
+    }
+  }
+
+  private fileNameFromUri(uri: string): string {
+    const index = uri.lastIndexOf('/')
+    const name = index >= 0 ? uri.substring(index + 1) : uri
+    return name.length > 0 ? name : 'community-image.jpg'
+  }
+
+  private contentTypeFromUri(uri: string): string {
+    const lower = uri.toLowerCase()
+    if (lower.endsWith('.png')) {
+      return 'image/png'
+    }
+    if (lower.endsWith('.gif')) {
+      return 'image/gif'
+    }
+    if (lower.endsWith('.webp')) {
+      return 'image/webp'
+    }
+    return 'image/jpeg'
+  }
+
+  private async submitPost(): Promise<void> {
+    if (this.postSubmitting) {
+      return
+    }
+    if (!this.isAuthenticated) {
+      this.communityError = 'Please log in before publishing.'
+      return
+    }
+    const content = this.postContent.trim()
+    if (content.length === 0) {
+      this.communityError = 'Please enter post content.'
+      return
+    }
+    try {
+      this.postSubmitting = true
+      this.communityError = ''
+      this.communityMessage = ''
+      const input: PostCreateInput = {
+        content: content,
+        imageUrls: this.postImageUrls
+      }
+      const petIdText = this.postPetIdText.trim()
+      if (petIdText.length > 0) {
+        const petId = Number(petIdText)
+        if (petId !== petId || petId <= 0) {
+          throw new Error('Pet ID must be a positive number.')
+        }
+        input.petId = petId
+      }
+      const created = await PetPalRepository.createPost(input)
+      this.posts = [created].concat(this.posts.filter((item: Post) => item.id !== created.id))
+      this.resetPostComposer()
+      this.postComposerVisible = false
+      this.communityMessage = 'Post published.'
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.communityError = `Publish failed: ${message}`
+    } finally {
+      this.postSubmitting = false
+    }
+  }
+
+  private async toggleLike(item: Post): Promise<void> {
+    if (!this.isAuthenticated) {
+      this.communityError = 'Please log in before liking posts.'
+      return
+    }
+    if (this.postActionId !== 0) {
+      return
+    }
+    try {
+      this.postActionId = item.id
+      this.communityError = ''
+      const updated = item.liked ? await PetPalRepository.unlikePost(item.id) : await PetPalRepository.likePost(item.id)
+      this.posts = this.posts.map((post: Post) => post.id === updated.id ? updated : post)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.communityError = `Like update failed: ${message}`
+    } finally {
+      this.postActionId = 0
+    }
+  }
+
+  private async deletePost(item: Post): Promise<void> {
+    if (!this.isAuthenticated || item.userId !== this.user.id) {
+      this.communityError = 'Only the author can delete this post.'
+      return
+    }
+    if (this.postActionId !== 0) {
+      return
+    }
+    try {
+      this.postActionId = item.id
+      this.communityError = ''
+      await PetPalRepository.deletePost(item.id)
+      this.posts = this.posts.filter((post: Post) => post.id !== item.id)
+      this.communityMessage = 'Post deleted.'
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.communityError = `Delete failed: ${message}`
+    } finally {
+      this.postActionId = 0
     }
   }
 
@@ -348,16 +528,116 @@ struct Index {
               .fontColor('#FFFFFF')
               .backgroundColor(PetPalTheme.primary)
               .borderRadius(PetPalTheme.radiusChip)
+              .enabled(this.isAuthenticated)
+              .onClick(() => {
+                this.postComposerVisible = !this.postComposerVisible
+                this.communityError = ''
+              })
           }
           .width('100%')
         }
 
-        ForEach(this.posts, (item: Post, index: number) => {
-          this.JournalPostCard(item, index === 0)
-        })
+        if (this.communityMessage.length > 0) {
+          Text(this.communityMessage)
+            .fontSize(12)
+            .fontColor(PetPalTheme.success)
+            .width('100%')
+            .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+            .backgroundColor(PetPalTheme.successSoft)
+            .borderRadius(16)
+        }
+        if (this.communityError.length > 0) {
+          Text(this.communityError)
+            .fontSize(12)
+            .fontColor(PetPalTheme.danger)
+            .width('100%')
+            .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+            .backgroundColor(PetPalTheme.dangerSoft)
+            .borderRadius(16)
+        }
+        if (!this.isAuthenticated) {
+          this.LoginRequiredPanel('Log in to publish, like, comment, and delete your own posts.')
+        } else if (this.postComposerVisible) {
+          this.PostComposer()
+        }
+        if (this.refreshing) {
+          this.EmptyStatePanel('Loading community posts', 'Fetching the latest community feed.')
+        } else if (this.posts.length > 0) {
+          ForEach(this.posts, (item: Post, index: number) => {
+            this.JournalPostCard(item, index === 0)
+          })
+        } else {
+          this.EmptyStatePanel('No community posts yet', 'Publish the first care note after logging in.')
+        }
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 120 })
     }
+  }
+
+  @Builder
+  PostComposer() {
+    Column({ space: 12 }) {
+      Text('New community post')
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(PetPalTheme.text)
+      TextInput({ text: this.postContent, placeholder: 'Share a care note' })
+        .height(54)
+        .backgroundColor(PetPalTheme.surface)
+        .borderRadius(PetPalTheme.radiusImage)
+        .padding({ left: 12, right: 12 })
+        .onChange((value: string) => {
+          this.postContent = value
+        })
+      TextInput({ text: this.postPetIdText, placeholder: 'Optional pet ID' })
+        .height(48)
+        .backgroundColor(PetPalTheme.surface)
+        .borderRadius(PetPalTheme.radiusImage)
+        .padding({ left: 12, right: 12 })
+        .onChange((value: string) => {
+          this.postPetIdText = value
+        })
+      if (this.postImageUrls.length > 0) {
+        Row({ space: 8 }) {
+          ForEach(this.postImageUrls, (imageUrl: string) => {
+            Image(imageUrl)
+              .width(72)
+              .height(72)
+              .objectFit(ImageFit.Cover)
+              .borderRadius(PetPalTheme.radiusCard)
+          })
+        }
+        .width('100%')
+      }
+      Row({ space: 10 }) {
+        Button(this.postUploading ? 'Uploading...' : `Add images ${this.postImageUrls.length}/9`)
+          .height(40)
+          .fontSize(13)
+          .fontColor(PetPalTheme.primary)
+          .backgroundColor(PetPalTheme.primarySoft)
+          .borderRadius(PetPalTheme.radiusChip)
+          .enabled(!this.postUploading && !this.postSubmitting && this.postImageUrls.length < 9)
+          .onClick(() => {
+            void this.pickPostImages()
+          })
+        Button(this.postSubmitting ? 'Publishing...' : 'Publish')
+          .height(40)
+          .fontSize(13)
+          .fontColor('#FFFFFF')
+          .backgroundColor(PetPalTheme.primary)
+          .borderRadius(PetPalTheme.radiusChip)
+          .enabled(!this.postSubmitting && !this.postUploading)
+          .onClick(() => {
+            void this.submitPost()
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(PetPalTheme.surfaceRaised)
+    .borderRadius(PetPalTheme.radiusPanel)
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -858,6 +1138,28 @@ struct Index {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
+        Button(item.liked ? 'Unlike' : 'Like')
+          .height(34)
+          .fontSize(12)
+          .fontColor(item.liked ? '#FFFFFF' : PetPalTheme.primary)
+          .backgroundColor(item.liked ? PetPalTheme.primary : PetPalTheme.primarySoft)
+          .borderRadius(PetPalTheme.radiusChip)
+          .enabled(this.postActionId === 0 || this.postActionId === item.id)
+          .onClick(() => {
+            void this.toggleLike(item)
+          })
+        if (this.isAuthenticated && item.userId === this.user.id) {
+          Button(this.postActionId === item.id ? 'Deleting...' : 'Delete')
+            .height(34)
+            .fontSize(12)
+            .fontColor(PetPalTheme.danger)
+            .backgroundColor(PetPalTheme.dangerSoft)
+            .borderRadius(PetPalTheme.radiusChip)
+            .enabled(this.postActionId === 0)
+            .onClick(() => {
+              void this.deletePost(item)
+            })
+        }
         CapsuleChip(`${item.commentCount} 评论`, PetPalTheme.surfaceWarm, PetPalTheme.textMuted)
       }
       .width('100%')
