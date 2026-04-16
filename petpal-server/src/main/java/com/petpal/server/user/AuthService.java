@@ -50,9 +50,9 @@ public class AuthService {
   }
 
   private boolean passwordMatches(String rawPassword, String storedPassword) {
-    if (storedPassword != null && storedPassword.startsWith("$2")) {
-      return passwordEncoder.matches(rawPassword, storedPassword);
+    if (storedPassword == null || storedPassword.isBlank()) {
+      return false;
     }
-    return storedPassword != null && storedPassword.equals(rawPassword);
+    return passwordEncoder.matches(rawPassword, storedPassword);
   }
 }

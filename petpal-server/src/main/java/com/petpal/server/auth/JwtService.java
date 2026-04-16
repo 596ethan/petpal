@@ -35,13 +35,21 @@ public class JwtService {
     return createToken(userId, phone, refreshExpireSeconds, "refresh");
   }
 
-  public Long parseUserId(String token) {
-    Claims claims = Jwts.parser()
+  public Long parseAccessUserId(String token) {
+    Claims claims = parseClaims(token);
+    String tokenType = claims.get("type", String.class);
+    if (!"access".equals(tokenType)) {
+      throw new IllegalArgumentException("Token type must be access");
+    }
+    return Long.parseLong(claims.getSubject());
+  }
+
+  private Claims parseClaims(String token) {
+    return Jwts.parser()
       .verifyWith(secretKey)
       .build()
       .parseSignedClaims(token)
       .getPayload();
-    return Long.parseLong(claims.getSubject());
   }
 
   private String createToken(Long userId, String phone, long expireSeconds, String type) {

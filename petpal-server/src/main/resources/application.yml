@@ -8,6 +8,10 @@ spring:
     url: jdbc:mysql://localhost:3306/petpal?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: root
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   data:
     redis:
       host: localhost

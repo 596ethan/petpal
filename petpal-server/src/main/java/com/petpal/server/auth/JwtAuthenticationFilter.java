@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -33,14 +34,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           filterChain.doFilter(request, response);
           return;
         }
-        Long userId = jwtService.parseUserId(token);
+        Long userId = jwtService.parseAccessUserId(token);
         UsernamePasswordAuthenticationToken authentication =
           UsernamePasswordAuthenticationToken.authenticated(String.valueOf(userId), token, List.of());
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (Exception ignored) {
         SecurityContextHolder.clearContext();
+        writeUnauthorized(response);
+        return;
       }
     }
     filterChain.doFilter(request, response);
+  }
+
+  private void writeUnauthorized(HttpServletResponse response) throws IOException {
+    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    response.setContentType("application/json");
+    response.getWriter().write("{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required\",\"data\":null,\"requestId\":null}");
   }
 }

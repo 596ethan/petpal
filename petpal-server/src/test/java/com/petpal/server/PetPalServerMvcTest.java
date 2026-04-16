@@ -16,6 +16,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petpal.server.common.api.ApiResponse;
+import com.petpal.server.common.error.AppException;
+import com.petpal.server.common.error.GlobalExceptionHandler;
 import com.petpal.server.file.FileStorageService;
 import com.petpal.server.file.dto.FileDownloadDto;
 import com.petpal.server.file.dto.FileUploadDto;
@@ -27,11 +30,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 @SpringBootTest
@@ -45,6 +51,9 @@ class PetPalServerMvcTest {
 
   @Autowired
   private ObjectMapper objectMapper;
+
+  @Autowired
+  private JdbcClient jdbcClient;
 
   @MockBean
   private FileStorageService fileStorageService;
@@ -82,6 +91,33 @@ class PetPalServerMvcTest {
           """))
       .andExpect(status().isUnauthorized())
       .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+  }
+
+  @Test
+  void loginRejectsPlaintextStoredPassword() throws Exception {
+    jdbcClient.sql("UPDATE user SET password = '123456' WHERE phone = '13800000001'")
+      .update();
+
+    mockMvc.perform(post("/api/user/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "phone": "13800000001",
+            "password": "123456"
+          }
+          """))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+  }
+
+  @Test
+  void refreshTokenCannotAccessProtectedPhoneEndpoint() throws Exception {
+    String refreshToken = loginAndGetRefreshToken("13800000001", "123456");
+
+    mockMvc.perform(get("/api/appointment/list")
+        .header("Authorization", "Bearer " + refreshToken))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
   }
 
   @Test
@@ -853,6 +889,51 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void uploadStorageFailureReturnsStableCode() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    when(fileStorageService.store(any(MultipartFile.class)))
+      .thenThrow(new AppException(500, "FILE_UPLOAD_FAILED", "File upload failed"));
+
+    mockMvc.perform(multipart("/api/file/upload")
+        .file(new MockMultipartFile("file", "cat.png", "image/png", new byte[] { 1, 2, 3 }))
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isInternalServerError())
+      .andExpect(jsonPath("$.code").value("FILE_UPLOAD_FAILED"))
+      .andExpect(jsonPath("$.message").value("File upload failed"));
+  }
+
+  @Test
+  void invalidJsonAndParameterTypeReturnStableBadRequest() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{"))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+      .andExpect(jsonPath("$.message").value("Invalid request body"));
+
+    mockMvc.perform(get("/api/pet/not-a-number")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+      .andExpect(jsonPath("$.message").value("Invalid request parameter"));
+  }
+
+  @Test
+  void multipartLimitExceptionUsesFileTooLargeCode() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    ResponseEntity<ApiResponse<Void>> response =
+      handler.handleMaxUploadSizeExceeded(new MaxUploadSizeExceededException(5L * 1024L * 1024L));
+
+    org.assertj.core.api.Assertions.assertThat(response.getStatusCode().value()).isEqualTo(400);
+    org.assertj.core.api.Assertions.assertThat(response.getBody()).isNotNull();
+    org.assertj.core.api.Assertions.assertThat(response.getBody().code()).isEqualTo("FILE_TOO_LARGE");
+    org.assertj.core.api.Assertions.assertThat(response.getBody().message()).isEqualTo("Image must be 5MB or smaller");
+  }
+
+  @Test
   void uploadStoresValidImageAndReturnsFileUrl() throws Exception {
     String accessToken = loginAndGetAccessToken("13800000001", "123456");
     when(fileStorageService.store(any(MultipartFile.class)))
@@ -878,7 +959,26 @@ class PetPalServerMvcTest {
       .andExpect(content().bytes(new byte[] { 1, 2, 3 }));
   }
 
+  @Test
+  void objectEndpointReturnsStableNotFoundCode() throws Exception {
+    when(fileStorageService.load("community/missing.png"))
+      .thenThrow(new AppException(404, "FILE_NOT_FOUND", "File not found"));
+
+    mockMvc.perform(get("/api/file/object/community/missing.png"))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("FILE_NOT_FOUND"))
+      .andExpect(jsonPath("$.message").value("File not found"));
+  }
+
   private String loginAndGetAccessToken(String phone, String password) throws Exception {
+    return loginAndGetToken(phone, password, "accessToken");
+  }
+
+  private String loginAndGetRefreshToken(String phone, String password) throws Exception {
+    return loginAndGetToken(phone, password, "refreshToken");
+  }
+
+  private String loginAndGetToken(String phone, String password, String tokenName) throws Exception {
     MvcResult result = mockMvc.perform(post("/api/user/login")
         .contentType(MediaType.APPLICATION_JSON)
         .content("""
@@ -891,7 +991,7 @@ class PetPalServerMvcTest {
       .andReturn();
 
     String body = result.getResponse().getContentAsString();
-    String marker = "\"accessToken\":\"";
+    String marker = "\"" + tokenName + "\":\"";
     int start = body.indexOf(marker) + marker.length();
     int end = body.indexOf('"', start);
     return body.substring(start, end);

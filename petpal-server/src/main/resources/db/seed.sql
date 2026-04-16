@@ -1,6 +1,6 @@
 INSERT INTO user (id, phone, password, nickname, avatar_url, bio) VALUES
-(1, '13800000001', '123456', 'Xiaoman', 'https://placehold.co/96x96', 'Cat and dog care journal'),
-(2, '13800000002', '123456', 'Aning', 'https://placehold.co/96x96', 'Weekly grooming notes');
+(1, '13800000001', '$2a$10$Trga2O1gLdnL6g8mvggVK.kdQdkQkkcEQ8AWzaS1oTD.t4eZLKfzi', 'Xiaoman', 'https://placehold.co/96x96', 'Cat and dog care journal'),
+(2, '13800000002', '$2a$10$Trga2O1gLdnL6g8mvggVK.kdQdkQkkcEQ8AWzaS1oTD.t4eZLKfzi', 'Aning', 'https://placehold.co/96x96', 'Weekly grooming notes');
 
 INSERT INTO user_follow (follower_id, following_id) VALUES
 (1, 2),

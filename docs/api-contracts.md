@@ -17,6 +17,19 @@ Implemented response envelope:
 
 Errors use the same top-level shape when handled by the backend exception layer. Phone APIs use `Authorization: Bearer <accessToken>` for protected endpoints.
 
+Release-hardening standard errors:
+
+| Scenario | HTTP | code | Message stability | Phone display |
+|---|---:|---|---|---|
+| Missing upload file | 400 | `FILE_REQUIRED` | Stable | Show backend message |
+| Non-image upload | 400 | `INVALID_FILE_TYPE` | Stable | Show backend message |
+| Upload over 5MB | 400 | `FILE_TOO_LARGE` | Stable | Show backend message |
+| Multipart size limit exceeded | 400 | `FILE_TOO_LARGE` | Stable | Show backend message |
+| JSON parse failure | 400 | `BAD_REQUEST` | Stable generic message | Show backend message |
+| Parameter type mismatch | 400 | `BAD_REQUEST` | Stable generic message | Show backend message |
+| Storage upload failure | 500 | `FILE_UPLOAD_FAILED` | Stable | Show backend message |
+| Uploaded object missing | 404 | `FILE_NOT_FOUND` | Stable | Image/detail fallback or failure state |
+
 ## Login
 
 Implemented:
@@ -55,6 +68,10 @@ Success data:
 Known failure:
 
 - Wrong credentials return `401` with code `INVALID_CREDENTIALS`.
+- Password storage is BCrypt-only. Plaintext stored passwords are not accepted.
+- Access tokens include `type=access`; refresh tokens include `type=refresh`.
+- Protected APIs reject refresh tokens used as access tokens with `401` and code `UNAUTHORIZED`.
+- Refresh-token rotation is not implemented in this MVP. The phone client clears session state and sends the user back to login on auth failure.
 
 ## Providers And Services
 
@@ -230,6 +247,93 @@ Appointment statuses currently used:
 - `CANCELLED`
 - `EXPIRED`
 
+## Community P0
+
+Implemented:
+
+- `GET /api/post/feed`
+- `GET /api/post/{postId}`
+- `POST /api/post`
+- `DELETE /api/post/{postId}`
+- `POST /api/post/{postId}/like`
+- `DELETE /api/post/{postId}/like`
+- `POST /api/post/{postId}/comment`
+- `GET /api/post/{postId}/comment`
+
+Community write endpoints require phone auth. Feed, detail, and comment reads are public, and include current-user `liked` state when a valid access token is supplied.
+
+Post create request:
+
+```json
+{
+  "petId": 1,
+  "content": "Nuomi finished the vaccine today.",
+  "imageUrls": [
+    "http://192.168.1.3:18080/api/file/object/community/example.jpg"
+  ]
+}
+```
+
+Post data includes:
+
+```json
+{
+  "id": 1,
+  "userId": 1,
+  "userNickname": "Xiaoman",
+  "userAvatarUrl": "https://placehold.co/96x96",
+  "petId": 1,
+  "petName": "Nuomi",
+  "content": "Nuomi finished the vaccine today.",
+  "imageUrls": [],
+  "topics": [],
+  "visibility": "PUBLIC",
+  "likeCount": 0,
+  "commentCount": 0,
+  "liked": false,
+  "createdAt": "2026-04-15T22:46:00"
+}
+```
+
+Implemented community validation:
+
+- Unauthenticated writes return auth failure.
+- Blank post content returns `400 INVALID_POST_FIELD`.
+- Non-owned optional `petId` returns `404 PET_NOT_FOUND`.
+- More than 9 post images, blank image URLs, or too-long image URLs return `400 INVALID_POST_IMAGE`.
+- Deleted or missing posts return `404 POST_NOT_FOUND` for detail, delete, like, unlike, comment create, and comment list.
+- Like and unlike are idempotent and backed by the `(post_id, user_id)` unique constraint.
+- Root comments are ordered by `created_at asc, id asc`.
+
+## File Upload
+
+Implemented:
+
+- `POST /api/file/upload`
+- `GET /api/file/object/{fileKey}`
+
+Upload request is multipart form-data with field name `file`.
+
+Success data:
+
+```json
+{
+  "fileKey": "community/example.jpg",
+  "url": "http://192.168.1.3:18080/api/file/object/community/example.jpg"
+}
+```
+
+Upload limits and errors:
+
+- Only image content types are accepted.
+- The maximum image size is 5MB.
+- Missing file returns `400 FILE_REQUIRED`.
+- Non-image file returns `400 INVALID_FILE_TYPE`.
+- Oversized file or multipart size limit returns `400 FILE_TOO_LARGE`.
+- Storage failure returns `500 FILE_UPLOAD_FAILED`.
+- Missing object reads return `404 FILE_NOT_FOUND`.
+- The returned `url` is a backend proxy URL. The phone client must not persist MinIO direct URLs as durable image URLs.
+
 ## Admin Appointment Status
 
 Implemented:
@@ -258,4 +362,4 @@ Implemented transitions are enforced by backend rules. Illegal transitions retur
 
 - Refresh-token rotation is not implemented.
 - Phone client repository tests exist, but this DevEco/Hvigor project currently does not expose a local unit-test task.
-- Community feed still has demo fallback and is not part of the accepted phone scope.
+- Comment replies, comment deletion, comment likes, post editing, search, recommendations, notifications, moderation workflows, and third-party media processing remain outside Community P0.
