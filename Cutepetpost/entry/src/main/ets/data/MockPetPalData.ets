@@ -61,33 +61,39 @@ export const vaccineRecords: VaccineRecord[] = [
 export const posts: Post[] = [
   {
     id: 1,
+    userId: 1,
     authorName: '小满',
     authorAvatarUrl: 'https://loremflickr.com/128/128/person?lock=41',
+    petId: 1,
     petName: '糯米',
     content: '糯米今天打完疫苗，回家后就趴在窗边晒太阳，状态比想象中轻松很多。',
     imageUrls: ['https://loremflickr.com/1200/900/cat,home?lock=51', 'https://loremflickr.com/1200/900/cat,window?lock=52'],
     topics: ['猫咪日常', '疫苗记录'],
     likeCount: 23,
     commentCount: 5,
+    liked: false,
     createdAt: '3月24日 18:20'
   },
   {
     id: 2,
+    userId: 2,
     authorName: '阿柚',
     authorAvatarUrl: 'https://loremflickr.com/128/128/person?lock=42',
+    petId: 2,
     petName: '七七',
     content: '七七第一次做全套美容，耳朵边修得特别精神，出来时一路都在摇尾巴。',
     imageUrls: ['https://loremflickr.com/1200/900/dog,grooming?lock=53'],
     topics: ['柯基', '美容'],
     likeCount: 56,
     commentCount: 12,
+    liked: true,
     createdAt: '3月23日 13:10'
   }
 ];
 
 export const comments: CommentItem[] = [
-  { id: 1, userName: '阿柚', content: '恢复得真快，看起来状态很好。', createdAt: '19:10' },
-  { id: 2, userName: '小满', content: '嗯，医生也说很稳定，今晚继续观察。', createdAt: '19:18' }
+  { id: 1, userId: 2, userName: '阿柚', content: '恢复得真快，看起来状态很好。', createdAt: '19:10' },
+  { id: 2, userId: 1, userName: '小满', content: '嗯，医生也说很稳定，今晚继续观察。', createdAt: '19:18' }
 ];
 
 export const providers: ServiceProvider[] = [

@@ -2,10 +2,13 @@ import { describe, beforeEach, afterEach, it, expect } from '@ohos/hypium';
 import http from '@ohos.net.http';
 import {
   AppointmentStatus,
+  CommentCreateInput,
+  FileUploadInput,
   HealthRecordCreateInput,
   PetCreateInput,
   PetGender,
   PetSpecies,
+  PostCreateInput,
   PetUpdateInput,
   UserProfile,
   VaccineRecordCreateInput
@@ -74,17 +77,60 @@ interface TestHealthRecordPayload {
   id: number;
   recordType: string;
   title: string;
-  description: string;
+  description: string | null;
   recordDate: string;
-  nextDate: string;
+  nextDate: string | null;
 }
 
 interface TestVaccineRecordPayload {
   id: number;
   vaccineName: string;
   vaccinatedAt: string;
-  nextDueAt: string;
-  hospital: string;
+  nextDueAt: string | null;
+  hospital: string | null;
+}
+
+interface TestPostPayload {
+  id: number;
+  userId: number;
+  userNickname: string;
+  userAvatarUrl: string;
+  petId: number;
+  petName: string;
+  content: string;
+  imageUrls: string[];
+  topics: string[];
+  visibility: string;
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
+  createdAt: string;
+}
+
+interface TestCommentPayload {
+  id: number;
+  parentId: number | null;
+  userId: number;
+  userNickname: string;
+  content: string;
+  createdAt: string;
+}
+
+interface TestFileUploadPayload {
+  fileKey: string;
+  url: string;
+}
+
+class TestUploadInput implements FileUploadInput {
+  fileName: string;
+  contentType: string;
+  data: ArrayBuffer;
+
+  constructor(fileName: string, contentType: string, data: ArrayBuffer) {
+    this.fileName = fileName;
+    this.contentType = contentType;
+    this.data = data;
+  }
 }
 
 
@@ -173,7 +219,37 @@ function vaccineRecordPayload(id: number = 8): TestVaccineRecordPayload {
   };
 }
 
-async function expectRejectsMessage(action: () => Promise<Object>, expected: string): Promise<void> {
+function postPayload(id: number = 20, liked: boolean = false, likeCount: number = 0): TestPostPayload {
+  return {
+    id: id,
+    userId: 1,
+    userNickname: 'Xiaoman',
+    userAvatarUrl: 'https://example.com/avatar.png',
+    petId: 1,
+    petName: 'Nuomi',
+    content: 'Community P0 #care',
+    imageUrls: ['https://example.com/community-1.png'],
+    topics: ['care'],
+    visibility: 'PUBLIC',
+    likeCount: likeCount,
+    commentCount: 0,
+    liked: liked,
+    createdAt: '2026-04-14 16:00:00'
+  };
+}
+
+function commentPayload(id: number = 30): TestCommentPayload {
+  return {
+    id: id,
+    parentId: null,
+    userId: 1,
+    userNickname: 'Xiaoman',
+    content: 'Root comment',
+    createdAt: '2026-04-14 16:05:00'
+  };
+}
+
+async function expectRejectsMessage(action: () => Promise<Object | void>, expected: string): Promise<void> {
   let message = '';
   try {
     await action();
@@ -451,9 +527,9 @@ export default function petPalRepositoryTest() {
               id: 10,
               recordType: "MEDICATION",
               title: "Deworming",
-              description: null as unknown as string,
+              description: null,
               recordDate: "2026-03-01",
-              nextDate: null as unknown as string
+              nextDate: null
             }
           ])
         };
@@ -510,8 +586,8 @@ export default function petPalRepositoryTest() {
               id: 12,
               vaccineName: "Feline triple vaccine",
               vaccinatedAt: "2025-04-18",
-              nextDueAt: null as unknown as string,
-              hospital: null as unknown as string
+              nextDueAt: null,
+              hospital: null
             }
           ])
         };
@@ -552,6 +628,185 @@ export default function petPalRepositoryTest() {
         species: PetSpecies.CAT,
         gender: PetGender.FEMALE
       }), "Pet name is required");
+    });
+
+    it("community read includes auth when session exists and maps post fields", 0, async () => {
+      PetPalRepository.storeSession({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        profile: profilePayload() as UserProfile
+      });
+      PetPalRepository.setRequestHandlerForTest(async (request: PetPalRepositoryRequest): Promise<PetPalRepositoryResponse> => {
+        expect(request.path).assertEqual("/post/feed");
+        expect(request.method).assertEqual(http.RequestMethod.GET);
+        expect(request.authRequired).assertTrue();
+        expect(request.headers.Authorization).assertEqual("Bearer access-token");
+        return {
+          responseCode: 200,
+          result: okEnvelope<TestPostPayload[]>([postPayload(21, true, 3)])
+        };
+      });
+
+      const posts = await PetPalRepository.getPostsAsync();
+
+      expect(posts.length).assertEqual(1);
+      expect(posts[0].id).assertEqual(21);
+      expect(posts[0].userId).assertEqual(1);
+      expect(posts[0].imageUrls.length).assertEqual(1);
+      expect(posts[0].liked).assertTrue();
+      expect(posts[0].likeCount).assertEqual(3);
+    });
+
+    it("create and delete post use locked community contract", 0, async () => {
+      PetPalRepository.storeSession({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        profile: profilePayload() as UserProfile
+      });
+      let callCount = 0;
+      PetPalRepository.setRequestHandlerForTest(async (request: PetPalRepositoryRequest): Promise<PetPalRepositoryResponse> => {
+        callCount += 1;
+        expect(request.authRequired).assertTrue();
+        expect(request.headers.Authorization).assertEqual("Bearer access-token");
+        if (callCount === 1) {
+          expect(request.path).assertEqual("/post");
+          expect(request.method).assertEqual(http.RequestMethod.POST);
+          const body = request.body as PostCreateInput;
+          expect(body.content).assertEqual("Community P0 #care");
+          expect(body.petId).assertEqual(1);
+          expect(body.imageUrls?.length).assertEqual(1);
+          return {
+            responseCode: 200,
+            result: okEnvelope<TestPostPayload>(postPayload(22, false, 0))
+          };
+        }
+        expect(request.path).assertEqual("/post/22");
+        expect(request.method).assertEqual(http.RequestMethod.DELETE);
+        return {
+          responseCode: 200,
+          result: okEnvelope<null>(null)
+        };
+      });
+
+      const post = await PetPalRepository.createPost({
+        content: "Community P0 #care",
+        petId: 1,
+        imageUrls: ["https://example.com/community-1.png"]
+      });
+      await PetPalRepository.deletePost(post.id);
+
+      expect(post.id).assertEqual(22);
+      expect(callCount).assertEqual(2);
+    });
+
+    it("like unlike and comment use locked community contract", 0, async () => {
+      PetPalRepository.storeSession({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        profile: profilePayload() as UserProfile
+      });
+      let callCount = 0;
+      PetPalRepository.setRequestHandlerForTest(async (request: PetPalRepositoryRequest): Promise<PetPalRepositoryResponse> => {
+        callCount += 1;
+        expect(request.authRequired).assertTrue();
+        expect(request.headers.Authorization).assertEqual("Bearer access-token");
+        if (callCount === 1) {
+          expect(request.path).assertEqual("/post/22/like");
+          expect(request.method).assertEqual(http.RequestMethod.POST);
+          return {
+            responseCode: 200,
+            result: okEnvelope<null>(null)
+          };
+        }
+        if (callCount === 2) {
+          expect(request.path).assertEqual("/post/22");
+          expect(request.method).assertEqual(http.RequestMethod.GET);
+          return {
+            responseCode: 200,
+            result: okEnvelope<TestPostPayload>(postPayload(22, true, 1))
+          };
+        }
+        if (callCount === 3) {
+          expect(request.path).assertEqual("/post/22/like");
+          expect(request.method).assertEqual(http.RequestMethod.DELETE);
+          return {
+            responseCode: 200,
+            result: okEnvelope<null>(null)
+          };
+        }
+        if (callCount === 4) {
+          expect(request.path).assertEqual("/post/22");
+          expect(request.method).assertEqual(http.RequestMethod.GET);
+          return {
+            responseCode: 200,
+            result: okEnvelope<TestPostPayload>(postPayload(22, false, 0))
+          };
+        }
+        expect(request.path).assertEqual("/post/22/comment");
+        expect(request.method).assertEqual(http.RequestMethod.POST);
+        const body = request.body as CommentCreateInput;
+        expect(body.content).assertEqual("Root comment");
+        return {
+          responseCode: 200,
+          result: okEnvelope<TestCommentPayload>(commentPayload())
+        };
+      });
+
+      const liked = await PetPalRepository.likePost(22);
+      const unliked = await PetPalRepository.unlikePost(22);
+      const comment = await PetPalRepository.addComment(22, { content: "Root comment" });
+
+      expect(liked.liked).assertTrue();
+      expect(unliked.liked).assertFalse();
+      expect(comment.userId).assertEqual(1);
+      expect(comment.content).assertEqual("Root comment");
+      expect(callCount).assertEqual(5);
+    });
+
+    it("upload post image sends multipart body and maps result", 0, async () => {
+      PetPalRepository.storeSession({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        profile: profilePayload() as UserProfile
+      });
+      PetPalRepository.setRequestHandlerForTest(async (request: PetPalRepositoryRequest): Promise<PetPalRepositoryResponse> => {
+        expect(request.path).assertEqual("/file/upload");
+        expect(request.method).assertEqual(http.RequestMethod.POST);
+        expect(request.authRequired).assertTrue();
+        expect(request.headers.Authorization).assertEqual("Bearer access-token");
+        expect(request.headers["Content-Type"].indexOf("multipart/form-data; boundary=")).assertEqual(0);
+        expect(request.body instanceof ArrayBuffer).assertTrue();
+        return {
+          responseCode: 200,
+          result: okEnvelope<TestFileUploadPayload>({
+            fileKey: "community/test.png",
+            url: "http://localhost:9000/petpal/community/test.png"
+          })
+        };
+      });
+
+      const data = new Uint8Array([1, 2, 3]).buffer as ArrayBuffer;
+      const input: FileUploadInput = new TestUploadInput("test.png", "image/png", data);
+      const result = await PetPalRepository.uploadPostImage(input);
+
+      expect(result.fileKey).assertEqual("community/test.png");
+      expect(result.url).assertEqual("http://localhost:9000/petpal/community/test.png");
+    });
+
+    it("community write surfaces backend errors", 0, async () => {
+      PetPalRepository.storeSession({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        profile: profilePayload() as UserProfile
+      });
+      PetPalRepository.setRequestHandlerForTest(async (): Promise<PetPalRepositoryResponse> => {
+        return {
+          responseCode: 404,
+          result: errorEnvelope("POST_NOT_FOUND", "Post not found")
+        };
+      });
+
+      await expectRejectsMessage(() => PetPalRepository.deletePost(99), "Post not found");
     });
 
   });

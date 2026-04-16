@@ -3,10 +3,14 @@ import http from '@ohos.net.http';
 import {
   Appointment,
   AppointmentStatus,
+  CommentCreateInput,
   CommentItem,
+  FileUploadInput,
+  FileUploadResult,
   HealthRecordCreateInput,
   PetCreateInput,
   PetUpdateInput,
+  PostCreateInput,
   VaccineRecordCreateInput,
   HealthRecord,
   Pet,
@@ -133,21 +137,32 @@ interface BackendAppointment {
 
 interface BackendPost {
   id: number;
+  userId: number;
   userNickname: string;
   userAvatarUrl: string;
+  petId?: number | null;
   petName?: string;
   content: string;
+  imageUrls?: string[];
   topics: string[];
   likeCount: number;
   commentCount: number;
+  liked: boolean;
   createdAt: string;
 }
 
 interface BackendComment {
   id: number;
+  parentId?: number | null;
+  userId: number;
   userNickname: string;
   content: string;
   createdAt: string;
+}
+
+interface BackendFileUpload {
+  fileKey: string;
+  url: string;
 }
 
 interface LoginRequestPayload {
@@ -158,7 +173,7 @@ interface LoginRequestPayload {
 export interface PetPalRepositoryRequest {
   path: string;
   method: http.RequestMethod;
-  body?: Object;
+  body?: Object | string | ArrayBuffer;
   authRequired: boolean;
   headers: Record<string, string>;
 }
@@ -394,29 +409,93 @@ export class PetPalRepository {
   }
 
   static async getPostsAsync(): Promise<Post[]> {
-    const payload = await PetPalRepository.request<BackendPost[]>('/post/feed', http.RequestMethod.GET, undefined, false);
+    const payload = await PetPalRepository.request<BackendPost[]>('/post/feed', http.RequestMethod.GET, undefined, PetPalRepository.communityReadAuthRequired());
     const mapped = payload.map((item: BackendPost) => PetPalRepository.mapPost(item));
-    if (mapped.length > 0) {
-      PetPalRepository.postCache = mapped;
-    }
+    PetPalRepository.postCache = mapped;
     return mapped;
   }
 
   static async getPostByIdAsync(postId: number): Promise<Post> {
-    const payload = await PetPalRepository.request<BackendPost>(`/post/${postId}`, http.RequestMethod.GET, undefined, false);
+    const payload = await PetPalRepository.request<BackendPost>(`/post/${postId}`, http.RequestMethod.GET, undefined, PetPalRepository.communityReadAuthRequired());
     const mapped = PetPalRepository.mapPost(payload);
-    const existingIndex = PetPalRepository.postCache.findIndex((item: Post) => item.id === postId);
-    if (existingIndex >= 0) {
-      PetPalRepository.postCache[existingIndex] = mapped;
-    }
+    PetPalRepository.upsertPostCache(mapped);
     return mapped;
   }
 
   static async getCommentsAsync(postId: number): Promise<CommentItem[]> {
-    const payload = await PetPalRepository.request<BackendComment[]>(`/post/${postId}/comment`, http.RequestMethod.GET, undefined, false);
+    const payload = await PetPalRepository.request<BackendComment[]>(`/post/${postId}/comment`, http.RequestMethod.GET, undefined, PetPalRepository.communityReadAuthRequired());
     const mapped = payload.map((item: BackendComment) => PetPalRepository.mapComment(item));
     PetPalRepository.commentCache[postId] = mapped;
     return mapped;
+  }
+
+  static async createPost(input: PostCreateInput): Promise<Post> {
+    const payload = await PetPalRepository.request<BackendPost>('/post', http.RequestMethod.POST, input);
+    const mapped = PetPalRepository.mapPost(payload);
+    PetPalRepository.postCache = [mapped].concat(PetPalRepository.postCache.filter((item: Post) => item.id !== mapped.id));
+    return mapped;
+  }
+
+  static async deletePost(postId: number): Promise<void> {
+    await PetPalRepository.request<void>(`/post/${postId}`, http.RequestMethod.DELETE);
+    PetPalRepository.postCache = PetPalRepository.postCache.filter((item: Post) => item.id !== postId);
+    PetPalRepository.commentCache[postId] = [];
+  }
+
+  static async likePost(postId: number): Promise<Post> {
+    await PetPalRepository.request<void>(`/post/${postId}/like`, http.RequestMethod.POST);
+    return PetPalRepository.getPostByIdAsync(postId);
+  }
+
+  static async unlikePost(postId: number): Promise<Post> {
+    await PetPalRepository.request<void>(`/post/${postId}/like`, http.RequestMethod.DELETE);
+    return PetPalRepository.getPostByIdAsync(postId);
+  }
+
+  static async addComment(postId: number, input: CommentCreateInput): Promise<CommentItem> {
+    const payload = await PetPalRepository.request<BackendComment>(`/post/${postId}/comment`, http.RequestMethod.POST, input);
+    const mapped = PetPalRepository.mapComment(payload);
+    const existing = PetPalRepository.commentCache[postId] ?? [];
+    PetPalRepository.commentCache[postId] = existing.concat([mapped]);
+    PetPalRepository.postCache = PetPalRepository.postCache.map((item: Post) => {
+      if (item.id !== postId) {
+        return item;
+      }
+      return {
+        id: item.id,
+        userId: item.userId,
+        authorName: item.authorName,
+        authorAvatarUrl: item.authorAvatarUrl,
+        petId: item.petId,
+        petName: item.petName,
+        content: item.content,
+        imageUrls: item.imageUrls,
+        topics: item.topics,
+        likeCount: item.likeCount,
+        commentCount: item.commentCount + 1,
+        liked: item.liked,
+        createdAt: item.createdAt
+      };
+    });
+    return mapped;
+  }
+
+  static async uploadPostImage(input: FileUploadInput): Promise<FileUploadResult> {
+    const boundary = `----PetPalBoundary${Date.now()}`;
+    const body = PetPalRepository.buildMultipartBody(input, boundary);
+    const payload = await PetPalRepository.request<BackendFileUpload>(
+      '/file/upload',
+      http.RequestMethod.POST,
+      body,
+      true,
+      {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`
+      }
+    );
+    return {
+      fileKey: payload.fileKey,
+      url: payload.url
+    };
   }
 
   static canCancelAppointment(status: AppointmentStatus): boolean {
@@ -446,14 +525,18 @@ export class PetPalRepository {
   private static async request<T>(
     path: string,
     method: http.RequestMethod,
-    body?: Object,
-    authRequired: boolean = true
+    body?: Object | string | ArrayBuffer,
+    authRequired: boolean = true,
+    extraHeaders?: Record<string, string>
   ): Promise<T> {
     let headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
     if (authRequired && PetPalRepository.session !== null) {
       headers.Authorization = `Bearer ${PetPalRepository.session.accessToken}`;
+    }
+    if (extraHeaders?.['Content-Type'] !== undefined) {
+      headers['Content-Type'] = extraHeaders['Content-Type'];
     }
 
     if (PetPalRepository.testRequestHandler !== null) {
@@ -478,7 +561,7 @@ export class PetPalRepository {
         usingCache: false
       };
       if (body !== undefined) {
-        options.extraData = JSON.stringify(body) as string | Object;
+        options.extraData = PetPalRepository.serializeBody(body) as string | Object | ArrayBuffer;
       }
       let response: http.HttpResponse;
       try {
@@ -549,6 +632,55 @@ export class PetPalRepository {
   private static normalizeBaseUrl(baseUrl: string): string {
     const normalized = baseUrl.trim();
     return normalized.endsWith('/') ? normalized.slice(0, normalized.length - 1) : normalized;
+  }
+
+  private static serializeBody(body: Object | string | ArrayBuffer): string | Object | ArrayBuffer {
+    if (typeof body === 'string' || body instanceof ArrayBuffer) {
+      return body;
+    }
+    return JSON.stringify(body);
+  }
+
+  private static communityReadAuthRequired(): boolean {
+    PetPalRepository.hydrateSessionFromStore();
+    return PetPalRepository.session !== null;
+  }
+
+  private static upsertPostCache(post: Post): void {
+    const existingIndex = PetPalRepository.postCache.findIndex((item: Post) => item.id === post.id);
+    if (existingIndex >= 0) {
+      PetPalRepository.postCache[existingIndex] = post;
+      return;
+    }
+    PetPalRepository.postCache = [post].concat(PetPalRepository.postCache);
+  }
+
+  private static buildMultipartBody(input: FileUploadInput, boundary: string): ArrayBuffer {
+    const fileName = PetPalRepository.escapeMultipartValue(input.fileName.length > 0 ? input.fileName : 'image.jpg');
+    const contentType = input.contentType.length > 0 ? input.contentType : 'image/jpeg';
+    const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${contentType}\r\n\r\n`;
+    const footer = `\r\n--${boundary}--\r\n`;
+    const headerBytes = new Uint8Array(PetPalRepository.encodeUtf8(header));
+    const fileBytes = new Uint8Array(input.data);
+    const footerBytes = new Uint8Array(PetPalRepository.encodeUtf8(footer));
+    const body = new Uint8Array(headerBytes.byteLength + fileBytes.byteLength + footerBytes.byteLength);
+    body.set(headerBytes, 0);
+    body.set(fileBytes, headerBytes.byteLength);
+    body.set(footerBytes, headerBytes.byteLength + fileBytes.byteLength);
+    return body.buffer;
+  }
+
+  private static encodeUtf8(value: string): ArrayBuffer {
+    const bytes = new Uint8Array(value.length);
+    for (let i = 0; i < value.length; i++) {
+      const code = value.charCodeAt(i);
+      bytes[i] = code <= 0x7F ? code : 95;
+    }
+    return bytes.buffer;
+  }
+
+  private static escapeMultipartValue(value: string): string {
+    return value.replace(/"/g, '').replace(/\r/g, '').replace(/\n/g, '');
   }
 
   private static hydrateSessionFromStore(): void {
@@ -679,14 +811,17 @@ export class PetPalRepository {
   private static mapPost(item: BackendPost): Post {
     return {
       id: item.id,
+      userId: item.userId ?? 0,
       authorName: item.userNickname,
       authorAvatarUrl: item.userAvatarUrl,
+      petId: item.petId ?? undefined,
       petName: item.petName ?? 'PetPal',
       content: item.content,
-      imageUrls: [],
-      topics: item.topics,
+      imageUrls: item.imageUrls ?? [],
+      topics: item.topics ?? [],
       likeCount: item.likeCount,
       commentCount: item.commentCount,
+      liked: item.liked ?? false,
       createdAt: item.createdAt
     };
   }
@@ -694,6 +829,7 @@ export class PetPalRepository {
   private static mapComment(item: BackendComment): CommentItem {
     return {
       id: item.id,
+      userId: item.userId ?? 0,
       userName: item.userNickname,
       content: item.content,
       createdAt: item.createdAt

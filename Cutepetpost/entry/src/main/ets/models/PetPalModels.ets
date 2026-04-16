@@ -102,22 +102,47 @@ export interface VaccineRecordCreateInput {
 
 export interface Post {
   id: number
+  userId: number
   authorName: string
   authorAvatarUrl: string
+  petId?: number
   petName: string
   content: string
   imageUrls: string[]
   topics: string[]
   likeCount: number
   commentCount: number
+  liked: boolean
   createdAt: string
+}
+
+export interface PostCreateInput {
+  content: string
+  petId?: number
+  imageUrls?: string[]
 }
 
 export interface CommentItem {
   id: number
+  userId: number
   userName: string
   content: string
   createdAt: string
+}
+
+export interface CommentCreateInput {
+  content: string
+}
+
+export interface FileUploadInput {
+  fileName: string
+  contentType: string
+  data: ArrayBuffer
+}
+
+export interface FileUploadResult {
+  fileKey: string
+  url: string
 }
 
 export interface ServiceProvider {
