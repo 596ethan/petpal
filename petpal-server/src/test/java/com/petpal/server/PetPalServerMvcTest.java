@@ -2,8 +2,12 @@ package com.petpal.server;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -12,17 +16,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petpal.server.file.FileStorageService;
+import com.petpal.server.file.dto.FileDownloadDto;
+import com.petpal.server.file.dto.FileUploadDto;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.multipart.MultipartFile;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,6 +45,9 @@ class PetPalServerMvcTest {
 
   @Autowired
   private ObjectMapper objectMapper;
+
+  @MockBean
+  private FileStorageService fileStorageService;
 
   @Value("${petpal.admin.token}")
   private String adminToken;
@@ -629,6 +642,240 @@ class PetPalServerMvcTest {
       .andExpect(jsonPath("$.data.name").value("Updated Clinic"))
       .andExpect(jsonPath("$.data.address").value("Updated Address 2"))
       .andExpect(jsonPath("$.data.rating").value(4.5));
+  }
+
+  @Test
+  void communityWritesRejectUnauthenticatedAccess() throws Exception {
+    mockMvc.perform(post("/api/post")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "content": "Community P0 unauthenticated"
+          }
+          """))
+      .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void createPostPersistsImagesAndFeedReturnsCurrentUserLikeState() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    MvcResult result = mockMvc.perform(post("/api/post")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "content": "Community P0 post with #care",
+            "imageUrls": [
+              "http://localhost:9000/petpal/community-1.jpg",
+              "http://localhost:9000/petpal/community-2.jpg"
+            ]
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.userId").value(1))
+      .andExpect(jsonPath("$.data.petId").value(1))
+      .andExpect(jsonPath("$.data.content").value("Community P0 post with #care"))
+      .andExpect(jsonPath("$.data.imageUrls.length()").value(2))
+      .andExpect(jsonPath("$.data.likeCount").value(0))
+      .andExpect(jsonPath("$.data.commentCount").value(0))
+      .andExpect(jsonPath("$.data.liked").value(false))
+      .andReturn();
+
+    long postId = readDataId(result.getResponse().getContentAsString());
+
+    mockMvc.perform(post("/api/post/{postId}/like", postId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+
+    mockMvc.perform(get("/api/post/{postId}", postId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.imageUrls[0]").value("http://localhost:9000/petpal/community-1.jpg"))
+      .andExpect(jsonPath("$.data.likeCount").value(1))
+      .andExpect(jsonPath("$.data.liked").value(true));
+
+    mockMvc.perform(get("/api/post/feed")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data[0].id").value((int) postId))
+      .andExpect(jsonPath("$.data[0].liked").value(true))
+      .andExpect(jsonPath("$.data[0].likeCount").value(1));
+  }
+
+  @Test
+  void likeAndUnlikeAreIdempotent() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/post/2/like")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+    mockMvc.perform(post("/api/post/2/like")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+
+    mockMvc.perform(get("/api/post/2")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.likeCount").value(57))
+      .andExpect(jsonPath("$.data.liked").value(true));
+
+    mockMvc.perform(delete("/api/post/2/like")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+    mockMvc.perform(delete("/api/post/2/like")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+
+    mockMvc.perform(get("/api/post/2")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.likeCount").value(56))
+      .andExpect(jsonPath("$.data.liked").value(false));
+  }
+
+  @Test
+  void commentCreationPersistsRootCommentsInAscendingOrder() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    MvcResult result = mockMvc.perform(post("/api/post")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "content": "Community P0 comment target"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andReturn();
+    long postId = readDataId(result.getResponse().getContentAsString());
+
+    mockMvc.perform(post("/api/post/{postId}/comment", postId)
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "content": "First root comment"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.content").value("First root comment"));
+
+    mockMvc.perform(post("/api/post/{postId}/comment", postId)
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "content": "Second root comment"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.content").value("Second root comment"));
+
+    mockMvc.perform(get("/api/post/{postId}/comment", postId))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.length()").value(2))
+      .andExpect(jsonPath("$.data[0].content").value("First root comment"))
+      .andExpect(jsonPath("$.data[1].content").value("Second root comment"));
+
+    mockMvc.perform(get("/api/post/{postId}", postId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.commentCount").value(2));
+  }
+
+  @Test
+  void deletePostSoftDeletesAndMakesPostUnavailable() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    MvcResult result = mockMvc.perform(post("/api/post")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "content": "Community P0 delete target"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andReturn();
+    long postId = readDataId(result.getResponse().getContentAsString());
+
+    mockMvc.perform(delete("/api/post/{postId}", postId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+
+    mockMvc.perform(get("/api/post/{postId}", postId))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+    mockMvc.perform(get("/api/post/{postId}/comment", postId))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+    mockMvc.perform(post("/api/post/{postId}/like", postId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+    mockMvc.perform(delete("/api/post/{postId}", postId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+  }
+
+  @Test
+  void nonAuthorDeleteReturnsPostNotFound() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000002", "123456");
+
+    mockMvc.perform(delete("/api/post/1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isNotFound())
+      .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
+  }
+
+  @Test
+  void uploadRejectsMissingInvalidAndOversizedFiles() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(multipart("/api/file/upload")
+        .file(new MockMultipartFile("other", "cat.png", "image/png", new byte[] { 1 }))
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("FILE_REQUIRED"));
+
+    mockMvc.perform(multipart("/api/file/upload")
+        .file(new MockMultipartFile("file", "note.txt", "text/plain", "hello".getBytes()))
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_FILE_TYPE"));
+
+    mockMvc.perform(multipart("/api/file/upload")
+        .file(new MockMultipartFile("file", "large.png", "image/png", new byte[6 * 1024 * 1024]))
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("FILE_TOO_LARGE"));
+  }
+
+  @Test
+  void uploadStoresValidImageAndReturnsFileUrl() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    when(fileStorageService.store(any(MultipartFile.class)))
+      .thenReturn(new FileUploadDto("community/test-image.png", "http://localhost:9000/petpal/community/test-image.png"));
+
+    mockMvc.perform(multipart("/api/file/upload")
+        .file(new MockMultipartFile("file", "cat.png", "image/png", new byte[] { 1, 2, 3 }))
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"))
+      .andExpect(jsonPath("$.data.fileKey").value("community/test-image.png"))
+      .andExpect(jsonPath("$.data.url").value("http://localhost/api/file/object/community/test-image.png"));
+  }
+
+  @Test
+  void objectEndpointStreamsStoredImageBytes() throws Exception {
+    when(fileStorageService.load("community/test-image.png"))
+      .thenReturn(new FileDownloadDto("image/png", new byte[] { 1, 2, 3 }));
+
+    mockMvc.perform(get("/api/file/object/community/test-image.png"))
+      .andExpect(status().isOk())
+      .andExpect(content().contentType("image/png"))
+      .andExpect(content().bytes(new byte[] { 1, 2, 3 }));
   }
 
   private String loginAndGetAccessToken(String phone, String password) throws Exception {

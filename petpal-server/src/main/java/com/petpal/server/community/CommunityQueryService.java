@@ -25,7 +25,7 @@ public class CommunityQueryService {
     this.jdbcClient = jdbcClient;
   }
 
-  public List<PostDto> feed() {
+  public List<PostDto> feed(Long currentUserId) {
     return jdbcClient.sql("""
       SELECT p.id,
              p.user_id,
@@ -57,12 +57,13 @@ public class CommunityQueryService {
         rs.getLong("like_count"),
         rs.getLong("comment_count"),
         PostVisibility.valueOf(rs.getString("visibility")),
-        timestampToString(rs.getTimestamp("created_at"))
+        timestampToString(rs.getTimestamp("created_at")),
+        currentUserId
       ))
       .list();
   }
 
-  public PostDto detail(Long postId) {
+  public PostDto detail(Long postId, Long currentUserId) {
     return jdbcClient.sql("""
       SELECT p.id,
              p.user_id,
@@ -94,7 +95,8 @@ public class CommunityQueryService {
         rs.getLong("like_count"),
         rs.getLong("comment_count"),
         PostVisibility.valueOf(rs.getString("visibility")),
-        timestampToString(rs.getTimestamp("created_at"))
+        timestampToString(rs.getTimestamp("created_at")),
+        currentUserId
       ))
       .optional()
       .orElseThrow(() -> new AppException(404, "POST_NOT_FOUND", "Post not found"));
@@ -112,6 +114,7 @@ public class CommunityQueryService {
       FROM comment c
       JOIN user u ON u.id = c.user_id
       WHERE c.post_id = :postId
+        AND c.parent_id IS NULL
       ORDER BY c.created_at ASC, c.id ASC
       """)
       .param("postId", postId)
@@ -126,7 +129,7 @@ public class CommunityQueryService {
       .list();
   }
 
-  private PostDto mapPost(Long id, Long userId, String userNickname, String userAvatarUrl, Long petId, String petName, String content, long likeCount, long commentCount, PostVisibility visibility, String createdAt) {
+  private PostDto mapPost(Long id, Long userId, String userNickname, String userAvatarUrl, Long petId, String petName, String content, long likeCount, long commentCount, PostVisibility visibility, String createdAt, Long currentUserId) {
     List<String> topics = extractTopics(content);
     return new PostDto(
       id,
@@ -136,14 +139,42 @@ public class CommunityQueryService {
       petId,
       petName,
       content,
-      List.of(),
+      loadImages(id),
       topics,
       visibility,
       likeCount,
       commentCount,
-      false,
+      isLikedByCurrentUser(id, currentUserId),
       createdAt
     );
+  }
+
+  private List<String> loadImages(Long postId) {
+    return jdbcClient.sql("""
+      SELECT image_url
+      FROM post_image
+      WHERE post_id = :postId
+      ORDER BY sort_order ASC, id ASC
+      """)
+      .param("postId", postId)
+      .query(String.class)
+      .list();
+  }
+
+  private boolean isLikedByCurrentUser(Long postId, Long currentUserId) {
+    if (currentUserId == null) {
+      return false;
+    }
+    Long count = jdbcClient.sql("""
+      SELECT COUNT(*)
+      FROM post_like
+      WHERE post_id = :postId AND user_id = :userId
+      """)
+      .param("postId", postId)
+      .param("userId", currentUserId)
+      .query(Long.class)
+      .single();
+    return count != null && count > 0;
   }
 
   private List<String> extractTopics(String content) {
