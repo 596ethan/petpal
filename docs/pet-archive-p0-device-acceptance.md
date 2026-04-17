@@ -47,8 +47,8 @@ The helper validates backend API behavior and leaves the main acceptance pet in 
 ## 1. Create Pet
 
 Operation:
-- Open the phone app and go to the "我的" tab.
-- Tap "新建宠物档案".
+- Open the phone app and go to the `我的` tab.
+- Tap `新建宠物档案`.
 - Enter:
   - Name: `验收豆豆`
   - Breed: `边牧`
@@ -58,11 +58,11 @@ Operation:
   - Weight: `8.6`
   - Avatar URL: leave empty
   - Neutered: keep `未绝育`
-- Tap "保存宠物档案".
+- Tap `保存宠物档案`.
 
 Expected result:
 - A success message appears: `宠物档案已创建`.
-- `验收豆豆` appears in "我的宠物档案".
+- `验收豆豆` appears in `我的宠物档案`.
 - Species, breed, birthday, and neutered state are visible.
 - Empty avatar does not crash or show a broken image; the text-avatar fallback is shown.
 
@@ -70,25 +70,25 @@ Failure triage:
 - Network error: verify backend process, phone/backend network, and `PETPAL_API_DEV_BASE_URL`.
 - Login error: log in again and retry.
 - Validation error: verify name is not blank, birthday is `yyyy-MM-dd`, and weight is a positive number.
-- Pet does not appear after success: switch tabs or re-enter "我的" and confirm the list reloads from backend.
+- Pet does not appear after success: switch tabs or re-enter `我的` and confirm the list reloads from backend.
 
 ## 2. Partial Update Pet
 
 Operation:
-- Open `验收豆豆` with "查看健康档案".
-- Tap "编辑资料".
+- Open `验收豆豆` with `查看健康档案`.
+- Tap `编辑资料`.
 - Change only:
   - Name: `验收豆豆-已更新`
   - Weight: `9.1`
 - Leave all other fields unchanged.
-- Tap "保存修改".
+- Tap `保存修改`.
 
 Expected result:
 - A success message appears: `宠物档案已更新`.
 - Detail title becomes `验收豆豆-已更新`.
 - Weight becomes `9.1kg`.
 - Omitted fields are preserved: species remains dog, breed remains `边牧`, birthday remains `2024-04-01`, gender remains male.
-- Returning to "我的" shows the updated name.
+- Returning to `我的` shows the updated name.
 
 Failure triage:
 - Omitted fields become blank: inspect `PUT /api/pet/{petId}` partial update behavior and UI request body.
@@ -98,18 +98,18 @@ Failure triage:
 ## 3. Soft Delete Pet
 
 Operation:
-- Return to "我的" and create a separate temporary pet:
+- Return to `我的` and create a separate temporary pet:
   - Name: `验收待删除`
   - Species: `猫咪`
   - Gender: `未知`
   - Other fields: optional
 - Open `验收待删除`.
-- Tap "删除档案".
+- Tap `删除档案`.
 
 Expected result:
 - Toast appears: `已删除`.
 - The app returns to the previous page.
-- "我的宠物档案" refreshes and no longer shows `验收待删除`.
+- `我的宠物档案` refreshes and no longer shows `验收待删除`.
 - The deleted pet detail page is not retained as the active screen.
 - Re-entering the deleted pet detail, if possible, shows a not found state.
 
@@ -123,14 +123,14 @@ Failure triage:
 
 Operation:
 - Open `验收豆豆-已更新`.
-- Tap "添加健康记录".
+- Tap `添加健康记录`.
 - Enter:
   - Type: `体检`
   - Title: `P0 体检记录`
   - Description: `真机验收健康记录`
   - Record date: `2026-04-14`
   - Next date: `2026-05-14`
-- Tap "保存健康记录".
+- Tap `保存健康记录`.
 
 Expected result:
 - A success message appears: `健康记录已添加`.
@@ -154,7 +154,7 @@ Operation:
   - Description: `用于排序验收`
   - Record date: `2026-04-14`
   - Next date: empty
-- Tap "保存健康记录".
+- Tap `保存健康记录`.
 - Observe the health timeline.
 
 Expected result:
@@ -171,13 +171,13 @@ Failure triage:
 
 Operation:
 - Open `验收豆豆-已更新`.
-- Tap "添加疫苗记录".
+- Tap `添加疫苗记录`.
 - Enter:
   - Vaccine name: `P0 狂犬疫苗`
   - Vaccinated at: `2026-04-14`
   - Next due at: `2027-04-14`
   - Hospital: `P0 验收宠物医院`
-- Tap "保存疫苗记录".
+- Tap `保存疫苗记录`.
 
 Expected result:
 - A success message appears: `疫苗记录已添加`.
@@ -247,7 +247,7 @@ Intentionally not implemented in Pet Archive P0:
 - Backend port is environment-specific. The Pet Archive P0 real-device acceptance used `18080` because this Windows environment reserves the `8000-8099` TCP range, including `8080`.
 - Physical-device testing requires the phone and development machine to be on the same LAN and the phone app to use the development machine LAN IP, not `127.0.0.1`.
 - The admin static page must use the same backend port as the running backend when validating appointment/admin paths.
-- Phone repository tests exist under `Cutepetpost/entry/src/test`, but this project still does not expose a local Hvigor unit-test task for those tests.
+- Phone repository tests exist under `Cutepetpost/entry/src/test`; run the available Hvigor test task when validating repository changes.
 - `promptAction.showToast` currently emits a deprecation warning during `assembleHap`; it does not block build or acceptance.
 - The API helper validates backend behavior; final UI acceptance still requires real-device manual operation.
 

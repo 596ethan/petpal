@@ -5,10 +5,14 @@ hvigorhome/
 npm-cache/
 _hvigor_home/
 _tmp_impeccable/
+_tmp_*
+*.tmp
+*.log
 AGENTS.md
 PHONE_MVP_SPEC.md
 *.md
 !README.md
+!AGENTS.md
 !docs/
 !docs/**/*.md
 
