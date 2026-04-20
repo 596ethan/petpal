@@ -108,7 +108,7 @@ struct Index {
   @State currentTab: number = 0
   @State user: UserProfile = EMPTY_USER
   @State pets: Pet[] = []
-  @State posts: Post[] = PetPalRepository.getPosts()
+  @State posts: Post[] = []
   @State providers: ServiceProvider[] = []
   @State appointments: Appointment[] = []
   @State isAuthenticated: boolean = PetPalRepository.getSession() !== null
@@ -167,6 +167,7 @@ struct Index {
       this.appointments = remoteAppointments
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      this.posts = PetPalRepository.getPosts()
       this.communityError = message
       this.refreshError = `内容刷新失败：${message}`
     } finally {
@@ -263,7 +264,7 @@ struct Index {
 
   private async pickPostImages(): Promise<void> {
     if (!this.isAuthenticated) {
-      this.communityError = 'Please log in before uploading images.'
+      this.communityError = '请先登录后再上传图片。'
       return
     }
     if (this.postUploading || this.postImageUrls.length >= 9) {
@@ -286,11 +287,11 @@ struct Index {
         this.postImageUrls = this.postImageUrls.concat([uploaded.url])
       }
       if (this.postImageUrls.length > 0) {
-        this.communityMessage = 'Image uploaded.'
+        this.communityMessage = '图片已上传'
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.communityError = `Image upload failed: ${message}`
+      this.communityError = `图片上传失败：${message}`
     } finally {
       this.postUploading = false
     }
@@ -337,12 +338,12 @@ struct Index {
       return
     }
     if (!this.isAuthenticated) {
-      this.communityError = 'Please log in before publishing.'
+      this.communityError = '请先登录后再发布。'
       return
     }
     const content = this.postContent.trim()
     if (content.length === 0) {
-      this.communityError = 'Please enter post content.'
+      this.communityError = '请输入帖子内容。'
       return
     }
     try {
@@ -365,10 +366,10 @@ struct Index {
       this.posts = [created].concat(this.posts.filter((item: Post) => item.id !== created.id))
       this.resetPostComposer()
       this.postComposerVisible = false
-      this.communityMessage = 'Post published.'
+      this.communityMessage = '帖子已发布'
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.communityError = `Publish failed: ${message}`
+      this.communityError = `发布失败：${message}`
     } finally {
       this.postSubmitting = false
     }
@@ -376,7 +377,7 @@ struct Index {
 
   private async toggleLike(item: Post): Promise<void> {
     if (!this.isAuthenticated) {
-      this.communityError = 'Please log in before liking posts.'
+      this.communityError = '请先登录后再点赞。'
       return
     }
     if (this.postActionId !== 0) {
@@ -389,7 +390,7 @@ struct Index {
       this.posts = this.posts.map((post: Post) => post.id === updated.id ? updated : post)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.communityError = `Like update failed: ${message}`
+      this.communityError = `点赞状态更新失败：${message}`
     } finally {
       this.postActionId = 0
     }
@@ -397,7 +398,7 @@ struct Index {
 
   private async deletePost(item: Post): Promise<void> {
     if (!this.isAuthenticated || item.userId !== this.user.id) {
-      this.communityError = 'Only the author can delete this post.'
+      this.communityError = '只有作者可以删除这条帖子。'
       return
     }
     if (this.postActionId !== 0) {
@@ -408,10 +409,10 @@ struct Index {
       this.communityError = ''
       await PetPalRepository.deletePost(item.id)
       this.posts = this.posts.filter((post: Post) => post.id !== item.id)
-      this.communityMessage = 'Post deleted.'
+      this.communityMessage = '帖子已删除'
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.communityError = `Delete failed: ${message}`
+      this.communityError = `删除失败：${message}`
     } finally {
       this.postActionId = 0
     }
@@ -556,18 +557,18 @@ struct Index {
             .borderRadius(16)
         }
         if (!this.isAuthenticated) {
-          this.LoginRequiredPanel('Log in to publish, like, comment, and delete your own posts.')
+          this.LoginRequiredPanel('登录后可以发布、点赞、评论并删除自己的帖子。')
         } else if (this.postComposerVisible) {
           this.PostComposer()
         }
         if (this.refreshing) {
-          this.EmptyStatePanel('Loading community posts', 'Fetching the latest community feed.')
+          this.EmptyStatePanel('正在加载社区动态', '正在获取最新的社区内容。')
         } else if (this.posts.length > 0) {
           ForEach(this.posts, (item: Post, index: number) => {
             this.JournalPostCard(item, index === 0)
           })
         } else {
-          this.EmptyStatePanel('No community posts yet', 'Publish the first care note after logging in.')
+          this.EmptyStatePanel('还没有社区动态', '登录后发布第一条照护记录。')
         }
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 120 })
@@ -577,11 +578,11 @@ struct Index {
   @Builder
   PostComposer() {
     Column({ space: 12 }) {
-      Text('New community post')
+      Text('发布社区动态')
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
         .fontColor(PetPalTheme.text)
-      TextInput({ text: this.postContent, placeholder: 'Share a care note' })
+      TextInput({ text: this.postContent, placeholder: '分享一条照护记录' })
         .height(54)
         .backgroundColor(PetPalTheme.surface)
         .borderRadius(PetPalTheme.radiusImage)
@@ -589,7 +590,7 @@ struct Index {
         .onChange((value: string) => {
           this.postContent = value
         })
-      TextInput({ text: this.postPetIdText, placeholder: 'Optional pet ID' })
+      TextInput({ text: this.postPetIdText, placeholder: '宠物 ID（可选）' })
         .height(48)
         .backgroundColor(PetPalTheme.surface)
         .borderRadius(PetPalTheme.radiusImage)
@@ -610,7 +611,7 @@ struct Index {
         .width('100%')
       }
       Row({ space: 10 }) {
-        Button(this.postUploading ? 'Uploading...' : `Add images ${this.postImageUrls.length}/9`)
+        Button(this.postUploading ? '上传中...' : `添加图片 ${this.postImageUrls.length}/9`)
           .height(40)
           .fontSize(13)
           .fontColor(PetPalTheme.primary)
@@ -620,7 +621,7 @@ struct Index {
           .onClick(() => {
             void this.pickPostImages()
           })
-        Button(this.postSubmitting ? 'Publishing...' : 'Publish')
+        Button(this.postSubmitting ? '发布中...' : '发布')
           .height(40)
           .fontSize(13)
           .fontColor('#FFFFFF')
@@ -1138,7 +1139,7 @@ struct Index {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Button(item.liked ? 'Unlike' : 'Like')
+        Button(item.liked ? '取消喜欢' : '喜欢')
           .height(34)
           .fontSize(12)
           .fontColor(item.liked ? '#FFFFFF' : PetPalTheme.primary)
@@ -1149,7 +1150,7 @@ struct Index {
             void this.toggleLike(item)
           })
         if (this.isAuthenticated && item.userId === this.user.id) {
-          Button(this.postActionId === item.id ? 'Deleting...' : 'Delete')
+          Button(this.postActionId === item.id ? '删除中...' : '删除')
             .height(34)
             .fontSize(12)
             .fontColor(PetPalTheme.danger)

@@ -26,10 +26,11 @@ const EMPTY_USER: UserProfile = {
 @Component
 struct PostDetail {
   private readonly postId: number = Number((this.getUIContext().getRouter().getParams() as Record<string, string>).postId ?? '1')
-  @State post: Post = PetPalRepository.getPostById(this.postId)
-  @State comments: CommentItem[] = PetPalRepository.getComments(this.post.id)
+  private readonly initialPost: Post | null = PetPalRepository.getPostById(this.postId)
+  @State post: Post | null = this.initialPost
+  @State comments: CommentItem[] = PetPalRepository.getComments(this.postId)
   @State currentUser: UserProfile = PetPalRepository.getSession()?.profile ?? EMPTY_USER
-  @State loading: boolean = false
+  @State loading: boolean = this.initialPost === null
   @State actionSubmitting: boolean = false
   @State commentSubmitting: boolean = false
   @State notFound: boolean = false
@@ -53,65 +54,72 @@ struct PostDetail {
       const message = error instanceof Error ? error.message : String(error)
       this.errorMessage = message
       this.notFound = message.indexOf('Post not found') >= 0 || message.indexOf('POST_NOT_FOUND') >= 0
+      if (this.notFound) {
+        this.post = null
+        this.comments = []
+      }
     } finally {
       this.loading = false
     }
   }
 
   private async toggleLike(): Promise<void> {
-    if (this.actionSubmitting) {
+    const post = this.post
+    if (this.actionSubmitting || post === null) {
       return
     }
     try {
       this.actionSubmitting = true
       this.errorMessage = ''
-      this.post = this.post.liked ? await PetPalRepository.unlikePost(this.post.id) : await PetPalRepository.likePost(this.post.id)
+      this.post = post.liked ? await PetPalRepository.unlikePost(post.id) : await PetPalRepository.likePost(post.id)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.errorMessage = `Like update failed: ${message}`
+      this.errorMessage = `点赞状态更新失败：${message}`
     } finally {
       this.actionSubmitting = false
     }
   }
 
   private async deletePost(): Promise<void> {
-    if (this.actionSubmitting || this.post.userId !== this.currentUser.id) {
+    const post = this.post
+    if (this.actionSubmitting || post === null || post.userId !== this.currentUser.id) {
       return
     }
     try {
       this.actionSubmitting = true
       this.errorMessage = ''
-      await PetPalRepository.deletePost(this.post.id)
-      this.successMessage = 'Post deleted.'
+      await PetPalRepository.deletePost(post.id)
+      this.successMessage = '帖子已删除'
       this.getUIContext().getRouter().back()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.errorMessage = `Delete failed: ${message}`
+      this.errorMessage = `删除失败：${message}`
     } finally {
       this.actionSubmitting = false
     }
   }
 
   private async submitComment(): Promise<void> {
-    if (this.commentSubmitting) {
+    const post = this.post
+    if (this.commentSubmitting || post === null) {
       return
     }
     const content = this.commentText.trim()
     if (content.length === 0) {
-      this.errorMessage = 'Please enter a comment.'
+      this.errorMessage = '请输入评论内容。'
       return
     }
     try {
       this.commentSubmitting = true
       this.errorMessage = ''
-      await PetPalRepository.addComment(this.post.id, { content: content })
+      await PetPalRepository.addComment(post.id, { content: content })
       this.commentText = ''
-      this.comments = await PetPalRepository.getCommentsAsync(this.post.id)
-      this.post = await PetPalRepository.getPostByIdAsync(this.post.id)
-      this.successMessage = 'Comment published.'
+      this.comments = await PetPalRepository.getCommentsAsync(post.id)
+      this.post = await PetPalRepository.getPostByIdAsync(post.id)
+      this.successMessage = '评论已发布'
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.errorMessage = `Comment failed: ${message}`
+      this.errorMessage = `评论失败：${message}`
     } finally {
       this.commentSubmitting = false
     }
@@ -121,22 +129,12 @@ struct PostDetail {
     Scroll() {
       Column({ space: 22 }) {
         if (this.loading) {
-          Text('Loading post...')
+          Text('正在加载帖子...')
             .fontSize(16)
             .fontColor(PetPalTheme.textMuted)
             .width('100%')
-        } else if (this.notFound) {
-          Text('Post not found')
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(PetPalTheme.text)
-            .width('100%')
-          Text('This post may have been deleted.')
-            .fontSize(13)
-            .fontColor(PetPalTheme.textMuted)
-            .width('100%')
-        } else {
-          if (this.errorMessage.length > 0) {
+        } else if (this.notFound || this.post === null) {
+          if (this.errorMessage.length > 0 && !this.notFound) {
             Text(this.errorMessage)
               .fontSize(12)
               .fontColor(PetPalTheme.danger)
@@ -145,18 +143,17 @@ struct PostDetail {
               .backgroundColor(PetPalTheme.dangerSoft)
               .borderRadius(16)
           }
-          if (this.successMessage.length > 0) {
-            Text(this.successMessage)
-              .fontSize(12)
-              .fontColor(PetPalTheme.success)
-              .width('100%')
-              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-              .backgroundColor(PetPalTheme.successSoft)
-              .borderRadius(16)
-          }
-          this.StoryHero()
-          this.ImageBand()
-          this.CommentSection()
+          Text(this.notFound ? '帖子不存在' : '暂时无法加载帖子')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(PetPalTheme.text)
+            .width('100%')
+          Text(this.notFound ? '这条帖子可能已被删除。' : '请稍后重试或返回社区列表。')
+            .fontSize(13)
+            .fontColor(PetPalTheme.textMuted)
+            .width('100%')
+        } else {
+          this.PostBody(this.post)
         }
       }
       .padding({ left: PetPalTheme.pagePadding, right: PetPalTheme.pagePadding, top: 18, bottom: 24 })
@@ -165,52 +162,80 @@ struct PostDetail {
   }
 
   @Builder
-  StoryHero() {
+  PostBody(post: Post) {
+    Column({ space: 22 }) {
+      if (this.errorMessage.length > 0) {
+        Text(this.errorMessage)
+          .fontSize(12)
+          .fontColor(PetPalTheme.danger)
+          .width('100%')
+          .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+          .backgroundColor(PetPalTheme.dangerSoft)
+          .borderRadius(16)
+      }
+      if (this.successMessage.length > 0) {
+        Text(this.successMessage)
+          .fontSize(12)
+          .fontColor(PetPalTheme.success)
+          .width('100%')
+          .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+          .backgroundColor(PetPalTheme.successSoft)
+          .borderRadius(16)
+      }
+      this.StoryHero(post)
+      this.ImageBand(post)
+      this.CommentSection()
+    }
+    .width('100%')
+  }
+
+  @Builder
+  StoryHero(post: Post) {
     Column({ space: 16 }) {
       Row({ space: 12 }) {
-        Image(this.post.authorAvatarUrl)
+        Image(post.authorAvatarUrl)
           .width(52)
           .height(52)
           .objectFit(ImageFit.Cover)
           .borderRadius(26)
         Column({ space: 5 }) {
-          Text(this.post.authorName)
+          Text(post.authorName)
             .fontSize(27)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFF8F3')
-          Text(`${this.post.petName} · ${this.post.createdAt}`)
+          Text(`${post.petName} · ${post.createdAt}`)
             .fontSize(13)
             .fontColor('#F3E4D6')
         }
         .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
-      Text(this.post.content)
+      Text(post.content)
         .fontSize(15)
         .lineHeight(24)
         .fontColor('#FFF8F3')
       Row({ space: 8 }) {
-        ForEach(this.post.topics, (topic: string) => {
+        ForEach(post.topics, (topic: string) => {
           PostChip(`#${topic}`, 'rgba(255, 248, 243, 0.09)', '#FFF8F3')
         })
       }
       Row({ space: 8 }) {
-        PostChip(`喜欢 ${this.post.likeCount}`, 'rgba(255, 248, 243, 0.07)', '#FFF8F3')
-        PostChip(`评论 ${this.post.commentCount}`, 'rgba(255, 248, 243, 0.07)', '#FFF8F3')
+        PostChip(`喜欢 ${post.likeCount}`, 'rgba(255, 248, 243, 0.07)', '#FFF8F3')
+        PostChip(`评论 ${post.commentCount}`, 'rgba(255, 248, 243, 0.07)', '#FFF8F3')
       }
       Row({ space: 8 }) {
-        Button(this.post.liked ? 'Unlike' : 'Like')
+        Button(post.liked ? '取消喜欢' : '喜欢')
           .height(38)
           .fontSize(13)
-          .fontColor(this.post.liked ? PetPalTheme.primary : '#FFFFFF')
-          .backgroundColor(this.post.liked ? '#FFF8F3' : PetPalTheme.primaryStrong)
+          .fontColor(post.liked ? PetPalTheme.primary : '#FFFFFF')
+          .backgroundColor(post.liked ? '#FFF8F3' : PetPalTheme.primaryStrong)
           .borderRadius(PetPalTheme.radiusChip)
           .enabled(!this.actionSubmitting)
           .onClick(() => {
             void this.toggleLike()
           })
-        if (this.post.userId === this.currentUser.id) {
-          Button(this.actionSubmitting ? 'Deleting...' : 'Delete')
+        if (post.userId === this.currentUser.id) {
+          Button(this.actionSubmitting ? '删除中...' : '删除')
             .height(38)
             .fontSize(13)
             .fontColor(PetPalTheme.danger)
@@ -234,14 +259,14 @@ struct PostDetail {
   }
 
   @Builder
-  ImageBand() {
+  ImageBand(post: Post) {
     Column({ space: 12 }) {
       Text('图片与片段')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor(PetPalTheme.text)
       Row({ space: 10 }) {
-        ForEach(this.post.imageUrls, (imageUrl: string, index: number) => {
+        ForEach(post.imageUrls, (imageUrl: string, index: number) => {
           Image(imageUrl)
             .width(index === 0 ? 138 : 108)
             .height(index === 0 ? 148 : 118)
@@ -264,7 +289,7 @@ struct PostDetail {
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor(PetPalTheme.text)
-      TextInput({ text: this.commentText, placeholder: 'Write a root comment' })
+      TextInput({ text: this.commentText, placeholder: '写一条评论' })
         .height(50)
         .backgroundColor(PetPalTheme.surface)
         .borderRadius(PetPalTheme.radiusPanel)
@@ -272,7 +297,7 @@ struct PostDetail {
         .onChange((value: string) => {
           this.commentText = value
         })
-      Button(this.commentSubmitting ? 'Publishing...' : 'Publish comment')
+      Button(this.commentSubmitting ? '发布中...' : '发表评论')
         .height(40)
         .fontSize(13)
         .fontColor('#FFFFFF')
@@ -307,7 +332,7 @@ struct PostDetail {
           .borderRadius(PetPalTheme.radiusPanel)
         })
       } else {
-        Text('No comments yet.')
+        Text('还没有评论。')
           .fontSize(13)
           .fontColor(PetPalTheme.textMuted)
       }

@@ -25,11 +25,9 @@ import {
 } from '../models/PetPalModels';
 import {
   appointments,
-  comments,
   currentUser,
   healthRecords,
   pets,
-  posts,
   providers,
   serviceItems,
   vaccineRecords
@@ -196,7 +194,7 @@ export interface AppointmentCreateInput {
 export class PetPalRepository {
   private static apiBaseUrl: string = PETPAL_API_BASE_URL;
   private static session: LoginSession | null = null;
-  private static postCache: Post[] = posts;
+  private static postCache: Post[] = [];
   private static commentCache: Record<number, CommentItem[]> = {};
   private static testRequestHandler: PetPalRepositoryRequestHandler | null = null;
 
@@ -244,6 +242,8 @@ export class PetPalRepository {
     PetPalRepository.testRequestHandler = null;
     PetPalRepository.session = null;
     PetPalRepository.apiBaseUrl = PetPalRepository.normalizeBaseUrl(PETPAL_API_BASE_URL);
+    PetPalRepository.postCache = [];
+    PetPalRepository.commentCache = {};
   }
 
   static getPets(): Pet[] {
@@ -269,13 +269,13 @@ export class PetPalRepository {
     return PetPalRepository.postCache;
   }
 
-  static getPostById(id: number): Post {
+  static getPostById(id: number): Post | null {
     const post = PetPalRepository.postCache.find((item: Post) => item.id === id);
-    return post ?? PetPalRepository.postCache[0] ?? posts[0];
+    return post ?? null;
   }
 
   static getComments(postId: number): CommentItem[] {
-    return PetPalRepository.commentCache[postId] ?? comments;
+    return PetPalRepository.commentCache[postId] ?? [];
   }
 
   static getProviders(): ServiceProvider[] {

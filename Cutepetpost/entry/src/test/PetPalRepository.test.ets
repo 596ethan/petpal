@@ -657,6 +657,26 @@ export default function petPalRepositoryTest() {
       expect(posts[0].likeCount).assertEqual(3);
     });
 
+    it("community cache starts empty and does not expose mock data", 0, () => {
+      expect(PetPalRepository.getPosts().length).assertEqual(0);
+      expect(PetPalRepository.getPostById(9999)).assertNull();
+      expect(PetPalRepository.getComments(9999).length).assertEqual(0);
+    });
+
+    it("community read failure leaves cache empty instead of falling back to mock data", 0, async () => {
+      PetPalRepository.setRequestHandlerForTest(async (): Promise<PetPalRepositoryResponse> => {
+        return {
+          responseCode: 500,
+          result: errorEnvelope("SERVER_ERROR", "Feed unavailable")
+        };
+      });
+
+      await expectRejectsMessage(() => PetPalRepository.getPostsAsync(), "Feed unavailable");
+
+      expect(PetPalRepository.getPosts().length).assertEqual(0);
+      expect(PetPalRepository.getPostById(9999)).assertNull();
+    });
+
     it("create and delete post use locked community contract", 0, async () => {
       PetPalRepository.storeSession({
         accessToken: "access-token",
