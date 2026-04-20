@@ -2,13 +2,17 @@ import http from '@ohos.net.http';
 import util from '@ohos.util';
 import { PetPalSessionStore } from './PetPalSessionStore';
 
-export type PetPalHttpMethod = 'GET' | 'POST' | 'PUT';
+export enum PetPalHttpMethod {
+  GET = 'GET',
+  POST = 'POST',
+  PUT = 'PUT'
+}
 
 export interface PetPalHttpRequestOptions {
   auth?: boolean;
   headers?: Record<string, string>;
   query?: Record<string, string | number | boolean | undefined | null>;
-  body?: string | Record<string, unknown> | ArrayBuffer | null;
+  body?: string | Object | ArrayBuffer | null;
   timeoutMs?: number;
 }
 
@@ -34,7 +38,7 @@ export class PetPalHttpError extends Error {
 export class PetPalHttpClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
-  private readonly decoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
+  private readonly decoder = util.TextDecoder.create('utf-8');
 
   constructor(baseUrl: string, timeoutMs: number = 15000) {
     this.baseUrl = this.normalizeBaseUrl(baseUrl);
@@ -42,21 +46,21 @@ export class PetPalHttpClient {
   }
 
   async get<T>(path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
-    return this.request<T>('GET', path, options);
+    return this.request<T>(PetPalHttpMethod.GET, path, options);
   }
 
   async post<T>(path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
-    return this.request<T>('POST', path, options);
+    return this.request<T>(PetPalHttpMethod.POST, path, options);
   }
 
   async put<T>(path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
-    return this.request<T>('PUT', path, options);
+    return this.request<T>(PetPalHttpMethod.PUT, path, options);
   }
 
   async request<T>(method: PetPalHttpMethod, path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
     const request = http.createHttp();
     const url = this.buildUrl(path, options.query);
-    const requestHeaders = this.buildHeaders(options.auth === true, options.headers);
+    const requestHeaders = this.buildHeaders(options.auth !== false, options.headers);
     const requestOptions: http.HttpRequestOptions = {
       method: this.toRequestMethod(method),
       header: requestHeaders,
@@ -67,7 +71,7 @@ export class PetPalHttpClient {
     };
 
     if (options.body !== undefined && options.body !== null) {
-      requestOptions.extraData = this.serializeBody(options.body) as string | Object | ArrayBuffer;
+      requestOptions.extraData = this.serializeBody(options.body);
     }
 
     try {
@@ -113,7 +117,9 @@ export class PetPalHttpClient {
     }
 
     const pairs: string[] = [];
-    for (const key in query) {
+    const keys = Object.keys(query);
+    for (let index = 0; index < keys.length; index++) {
+      const key = keys[index];
       const value = query[key];
       if (value === undefined || value === null) {
         continue;
@@ -125,23 +131,31 @@ export class PetPalHttpClient {
   }
 
   private buildHeaders(includeAuth: boolean, headers?: Record<string, string>): Record<string, string> {
-    const merged: Record<string, string> = {
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    };
+    const merged: Record<string, string> = {};
+    merged['Accept'] = 'application/json';
+    merged['Content-Type'] = 'application/json';
 
     if (includeAuth) {
-      Object.assign(merged, PetPalSessionStore.getAuthHeaders());
+      const authHeaders = PetPalSessionStore.getAuthHeaders();
+      const authKeys = Object.keys(authHeaders);
+      for (let index = 0; index < authKeys.length; index++) {
+        const key = authKeys[index];
+        merged[key] = authHeaders[key];
+      }
     }
 
     if (headers) {
-      Object.assign(merged, headers);
+      const headerKeys = Object.keys(headers);
+      for (let index = 0; index < headerKeys.length; index++) {
+        const key = headerKeys[index];
+        merged[key] = headers[key];
+      }
     }
 
     return merged;
   }
 
-  private serializeBody(body: string | Record<string, unknown> | ArrayBuffer): string | Record<string, unknown> | ArrayBuffer {
+  private serializeBody(body: string | Object | ArrayBuffer): string | Object | ArrayBuffer {
     if (typeof body === 'string' || body instanceof ArrayBuffer) {
       return body;
     }
@@ -172,8 +186,10 @@ export class PetPalHttpClient {
 
   private normalizeHeaders(headers: Object): Record<string, string> {
     const normalized: Record<string, string> = {};
-    const source = headers as Record<string, unknown>;
-    for (const key in source) {
+    const source = headers as Record<string, string | string[] | number | boolean | null | undefined>;
+    const keys = Object.keys(source);
+    for (let index = 0; index < keys.length; index++) {
+      const key = keys[index];
       const value = source[key];
       if (Array.isArray(value)) {
         normalized[key] = value.map((item) => String(item)).join(', ');
@@ -185,10 +201,10 @@ export class PetPalHttpClient {
   }
 
   private toRequestMethod(method: PetPalHttpMethod): http.RequestMethod {
-    if (method === 'POST') {
+    if (method === PetPalHttpMethod.POST) {
       return http.RequestMethod.POST;
     }
-    if (method === 'PUT') {
+    if (method === PetPalHttpMethod.PUT) {
       return http.RequestMethod.PUT;
     }
     return http.RequestMethod.GET;
