@@ -6,7 +6,7 @@ PetPal is a phone-first MVP workspace for the HarmonyOS client, backend APIs, an
 - `Cutepetpost`: HarmonyOS phone client and current primary deliverable.
 - `petpal-server`: Spring Boot backend for authentication, provider, pet, and appointment APIs.
 - `petpal-admin`: lightweight admin UI for appointment status operations required by the phone MVP.
-- `deploy`: local infrastructure for MySQL, Redis, and MinIO.
+- `deploy`: local infrastructure for Redis and MinIO. The default development database is a local MySQL service on the host.
 - `docs`: architecture notes, slice specs, and API contracts.
 - `scripts`: repeatable local development commands.
 
@@ -33,6 +33,18 @@ Start local dependencies:
 ```powershell
 .\scripts\dev-deps-up.ps1
 ```
+
+This starts Redis and MinIO only. Start or verify local MySQL separately:
+
+```text
+host: localhost
+port: 3306
+database: petpal
+user: root
+password: 54321
+```
+
+Initialize a fresh local database with `petpal-server/src/main/resources/db/schema.sql` and `petpal-server/src/main/resources/db/seed.sql`. If a `petpal` database already exists, inspect it before applying SQL so existing local data is not accidentally dropped.
 
 Run backend tests:
 
@@ -70,7 +82,7 @@ export const PETPAL_API_DEV_BASE_URL: string = 'http://192.168.1.3:<backend-port
 
 4. Open `petpal-admin/index.html` in the development machine browser. Set API base URL to the same backend port, for example `http://127.0.0.1:18080`, and admin token to `petpal-admin-token-change-me`.
 
-5. If local `MySQL80` already uses port `3306`, run the project MySQL container on another host port such as `3307`, then start the backend with a datasource URL pointing at that database port. This is independent from the backend HTTP port.
+5. The backend uses the host MySQL service at `localhost:3306` with `root/54321` by default. Docker MySQL is no longer the default path; `.\scripts\dev-deps-up.ps1` only starts Redis and MinIO. If `petpal` does not exist, initialize it with `schema.sql` and `seed.sql` after checking that you are not overwriting useful local data.
 
 6. If the admin page shows `failed to fetch` while command-line admin API requests work, check CORS/preflight handling. The backend must allow `OPTIONS /**` and the `X-PetPal-Admin-Token` header.
 

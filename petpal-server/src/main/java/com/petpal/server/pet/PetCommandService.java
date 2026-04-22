@@ -1,6 +1,7 @@
 package com.petpal.server.pet;
 
 import com.petpal.server.common.error.AppException;
+import com.petpal.server.common.enums.PetSpecies;
 import com.petpal.server.pet.dto.HealthRecordCreateRequest;
 import com.petpal.server.pet.dto.HealthRecordDto;
 import com.petpal.server.pet.dto.PetCreateRequest;
@@ -20,6 +21,11 @@ import org.springframework.stereotype.Service;
 public class PetCommandService {
   private static final double MIN_WEIGHT = 0.01;
   private static final double MAX_WEIGHT = 999.99;
+  private static final String DEFAULT_DOG_AVATAR_URL = "https://loremflickr.com/320/320/dog?lock=9101";
+  private static final String DEFAULT_CAT_AVATAR_URL = "https://loremflickr.com/320/320/cat?lock=9102";
+  private static final String DEFAULT_RABBIT_AVATAR_URL = "https://loremflickr.com/320/320/rabbit?lock=9103";
+  private static final String DEFAULT_BIRD_AVATAR_URL = "https://loremflickr.com/320/320/bird?lock=9104";
+  private static final String DEFAULT_OTHER_AVATAR_URL = "https://loremflickr.com/320/320/pet?lock=9105";
 
   private final JdbcClient jdbcClient;
   private final PetQueryService petQueryService;
@@ -32,7 +38,10 @@ public class PetCommandService {
   public PetDto create(long userId, PetCreateRequest request) {
     String name = requiredText(request.name(), 50, "INVALID_PET_FIELD", "Pet name is required");
     String breed = optionalText(request.breed(), 50, "INVALID_PET_FIELD", "Pet breed is too long");
-    String avatarUrl = optionalText(request.avatarUrl(), 255, "INVALID_PET_FIELD", "Pet avatar URL is too long");
+    String avatarUrl = defaultAvatarUrl(
+      request.species(),
+      optionalText(request.avatarUrl(), 255, "INVALID_PET_FIELD", "Pet avatar URL is too long")
+    );
     Date birthday = parseOptionalDate(request.birthday(), "INVALID_PET_FIELD", "Pet birthday must use yyyy-MM-dd");
     Double weight = validateWeight(request.weight());
     boolean neutered = request.neutered() != null && request.neutered();
@@ -190,6 +199,19 @@ public class PetCommandService {
       throw new AppException(400, code, message);
     }
     return trimmed;
+  }
+
+  private String defaultAvatarUrl(PetSpecies species, String avatarUrl) {
+    if (avatarUrl != null) {
+      return avatarUrl;
+    }
+    return switch (species) {
+      case DOG -> DEFAULT_DOG_AVATAR_URL;
+      case CAT -> DEFAULT_CAT_AVATAR_URL;
+      case RABBIT -> DEFAULT_RABBIT_AVATAR_URL;
+      case BIRD -> DEFAULT_BIRD_AVATAR_URL;
+      case OTHER -> DEFAULT_OTHER_AVATAR_URL;
+    };
   }
 
   private Double validateWeight(Double weight) {

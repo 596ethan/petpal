@@ -47,7 +47,7 @@ All endpoints require phone auth with `Authorization: Bearer <accessToken>`.
 - `POST /api/pet/{petId}/vaccine` adds a vaccine record to a current-user non-deleted pet.
 - `GET /api/pet/{petId}/vaccine` returns records ordered by `vaccinatedAt desc, id desc`.
 
-Dates use `yyyy-MM-dd`. Pet weight is stored as a kg number. Avatar upload is out of scope; `avatarUrl` is an optional URL-like string only. Vaccine records do not automatically create health timeline records.
+Dates use `yyyy-MM-dd`. Pet weight is stored as a kg number. Avatar upload is out of scope; `avatarUrl` is an optional URL-like string only. When `avatarUrl` is omitted or blank on create, the backend stores a species-specific default avatar URL. Vaccine records do not automatically create health timeline records.
 
 ## Error Semantics
 

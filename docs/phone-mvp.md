@@ -149,7 +149,7 @@ A phone user can maintain the core pet archive lifecycle: create a pet profile, 
     - `gender: "MALE" | "FEMALE" | "UNKNOWN"`
     - `birthday?: string` in `yyyy-MM-dd`
     - `weight?: number` in kg
-    - `avatarUrl?: string`
+    - `avatarUrl?: string`; when omitted or blank, the backend stores a species-specific default avatar URL
     - `neutered?: boolean`
   - Success:
     - created pet profile owned by the current user
@@ -184,6 +184,7 @@ A phone user can maintain the core pet archive lifecycle: create a pet profile, 
 
 ### Success state
 - Creating a pet persists it to the backend and refreshes the phone pet list.
+- Creating a pet without an avatar URL still returns and stores a non-empty default avatar URL.
 - Partial update changes only submitted fields and preserves omitted fields.
 - Deleting a pet removes it from the phone pet list and returns the user to the previous screen with a success message.
 - Adding a health record persists it and the health timeline refreshes in backend sort order.
@@ -198,6 +199,8 @@ A phone user can maintain the core pet archive lifecycle: create a pet profile, 
 
 ### Test cases
 - backend: pet creation persists and appears in current user's pet list
+- backend: pet creation without `avatarUrl` stores a species-specific default avatar URL
+- backend: pet creation with custom `avatarUrl` preserves the submitted URL
 - backend: partial update preserves omitted fields
 - backend: partial update rejects blank required fields
 - backend: delete soft-deletes the pet and removes it from list

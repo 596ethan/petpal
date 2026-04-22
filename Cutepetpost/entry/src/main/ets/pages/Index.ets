@@ -1139,29 +1139,6 @@ struct Index {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Button(item.liked ? '取消喜欢' : '喜欢')
-          .height(34)
-          .fontSize(12)
-          .fontColor(item.liked ? '#FFFFFF' : PetPalTheme.primary)
-          .backgroundColor(item.liked ? PetPalTheme.primary : PetPalTheme.primarySoft)
-          .borderRadius(PetPalTheme.radiusChip)
-          .enabled(this.postActionId === 0 || this.postActionId === item.id)
-          .onClick(() => {
-            void this.toggleLike(item)
-          })
-        if (this.isAuthenticated && item.userId === this.user.id) {
-          Button(this.postActionId === item.id ? '删除中...' : '删除')
-            .height(34)
-            .fontSize(12)
-            .fontColor(PetPalTheme.danger)
-            .backgroundColor(PetPalTheme.dangerSoft)
-            .borderRadius(PetPalTheme.radiusChip)
-            .enabled(this.postActionId === 0)
-            .onClick(() => {
-              void this.deletePost(item)
-            })
-        }
-        CapsuleChip(`${item.commentCount} 评论`, PetPalTheme.surfaceWarm, PetPalTheme.textMuted)
       }
       .width('100%')
 
@@ -1207,6 +1184,33 @@ struct Index {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+      }
+      .width('100%')
+      Row({ space: 8 }) {
+        Button(item.liked ? '取消喜欢' : '喜欢')
+          .height(34)
+          .fontSize(12)
+          .fontColor(item.liked ? '#FFFFFF' : PetPalTheme.primary)
+          .backgroundColor(item.liked ? PetPalTheme.primary : PetPalTheme.primarySoft)
+          .borderRadius(PetPalTheme.radiusChip)
+          .enabled(this.postActionId === 0 || this.postActionId === item.id)
+          .onClick(() => {
+            void this.toggleLike(item)
+          })
+        CapsuleChip(`${item.commentCount} 评论`, PetPalTheme.surfaceWarm, PetPalTheme.textMuted)
+        Blank()
+        if (this.isAuthenticated && item.userId === this.user.id) {
+          Button(this.postActionId === item.id ? '删除中...' : '删除')
+            .height(34)
+            .fontSize(12)
+            .fontColor(PetPalTheme.danger)
+            .backgroundColor(PetPalTheme.dangerSoft)
+            .borderRadius(PetPalTheme.radiusChip)
+            .enabled(this.postActionId === 0)
+            .onClick(() => {
+              void this.deletePost(item)
+            })
+        }
       }
       .width('100%')
     }

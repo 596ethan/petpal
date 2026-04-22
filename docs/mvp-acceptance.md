@@ -73,9 +73,20 @@ Backend startup:
 .\scripts\run-backend.ps1
 ```
 
+`dev-deps-up.ps1` starts Redis and MinIO only. The default business database is the host MySQL service:
+
+```text
+localhost:3306
+database: petpal
+user: root
+password: 54321
+```
+
+For a fresh database, create `petpal` and apply `petpal-server/src/main/resources/db/schema.sql` followed by `petpal-server/src/main/resources/db/seed.sql`. If the database already exists, inspect the current tables first and avoid dropping local data unless you intentionally reset the environment.
+
 The appointment MVP accepted test run used backend port `19080`. The Pet Archive P0 accepted test run used backend port `18080` because this Windows environment reserves the `8000-8099` TCP range, including `8080`. Any available backend port is acceptable for local acceptance as long as the phone app and admin page point to the same running backend port.
 
-If local `MySQL80` already uses port `3306`, run the project MySQL container on another host port such as `3307`; this database port is independent from the backend HTTP port.
+Docker MySQL is no longer the default development path. Keep the backend datasource pointed at the host MySQL `3306`; the backend HTTP port is independent from the database port.
 
 Known development login accounts now require BCrypt hashes in the database. If an existing persistent local database still has plaintext `123456` for the seed users, reset them to the release-hardening hash:
 

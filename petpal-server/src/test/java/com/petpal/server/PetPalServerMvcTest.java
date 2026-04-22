@@ -201,6 +201,45 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void createPetUsesDefaultAvatarWhenAvatarUrlIsMissing() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/pet")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Default Avatar Dog",
+            "species": "DOG",
+            "gender": "MALE"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"))
+      .andExpect(jsonPath("$.data.avatarUrl").value("https://loremflickr.com/320/320/dog?lock=9101"));
+  }
+
+  @Test
+  void createPetKeepsCustomAvatarUrl() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+
+    mockMvc.perform(post("/api/pet")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "name": "Custom Avatar Cat",
+            "species": "CAT",
+            "gender": "FEMALE",
+            "avatarUrl": "https://example.com/custom-cat.png"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"))
+      .andExpect(jsonPath("$.data.avatarUrl").value("https://example.com/custom-cat.png"));
+  }
+
+  @Test
   void updatePetPartiallyPreservesOmittedFields() throws Exception {
     String accessToken = loginAndGetAccessToken("13800000001", "123456");
 
