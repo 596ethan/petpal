@@ -24,7 +24,8 @@ import {
   VaccineRecord
 } from '../models/PetPalModels';
 import { PETPAL_API_BASE_URL } from '../config/PetPalAppConfig';
-import { PetPalHttpClient, PetPalHttpError, PetPalHttpMethod } from '../services/PetPalHttpClient';
+import { PetPalApiClient } from '../services/PetPalApiClient';
+import { PetPalHttpMethod } from '../services/PetPalHttpClient';
 import { PetPalSessionSnapshot, PetPalSessionStore } from '../services/PetPalSessionStore';
 
 export interface LoginSession {
@@ -203,6 +204,7 @@ export class PetPalRepository {
     PetPalSessionStore.initialize(context);
     PetPalRepository.hydrateSessionFromStore();
     PetPalRepository.apiBaseUrl = PetPalRepository.normalizeBaseUrl(PetPalRepository.apiBaseUrl);
+    PetPalRepository.configureApiClient();
   }
 
   static getCurrentUser(): UserProfile {
@@ -222,6 +224,7 @@ export class PetPalRepository {
     const normalized = PetPalRepository.normalizeBaseUrl(baseUrl);
     if (normalized.length > 0) {
       PetPalRepository.apiBaseUrl = normalized;
+      PetPalRepository.configureApiClient();
     }
   }
 
@@ -245,6 +248,7 @@ export class PetPalRepository {
     PetPalRepository.apiBaseUrl = PetPalRepository.normalizeBaseUrl(PETPAL_API_BASE_URL);
     PetPalRepository.postCache = [];
     PetPalRepository.commentCache = {};
+    PetPalRepository.configureApiClient();
   }
 
   static getPetById(id: number): Pet {
@@ -545,25 +549,13 @@ export class PetPalRepository {
       return PetPalRepository.parseResponse<T>(response.responseCode, response.result, authRequired);
     }
 
-    const client = new PetPalHttpClient(PetPalRepository.apiBaseUrl, 30000);
-    try {
-      const response = await client.request<BackendEnvelope<T>>(PetPalRepository.toPetPalHttpMethod(method), path, {
-        auth: false,
-        headers: headers,
-        body: body,
-        timeoutMs: 30000
-      });
-      return PetPalRepository.parseResponse<T>(response.statusCode, response.rawBody, authRequired);
-    } catch (error) {
-      if (error instanceof PetPalHttpError) {
-        if (error.statusCode > 0 || error.rawBody.length > 0) {
-          return PetPalRepository.parseResponse<T>(error.statusCode, error.rawBody, authRequired);
-        }
-        throw new Error(error.message.length > 0 ? error.message : '请求失败');
-      }
-      const message = error instanceof Error ? error.message : '请求失败';
-      throw new Error(message);
-    }
+    const response = await PetPalApiClient.rawRequest(PetPalRepository.toPetPalHttpMethod(method), path, {
+      auth: false,
+      headers: headers,
+      body: body,
+      timeoutMs: 30000
+    });
+    return PetPalRepository.parseResponse<T>(response.statusCode, response.rawBody, authRequired);
   }
 
   private static async parseResponse<T>(responseCode: number, raw: string, authRequired: boolean): Promise<T> {
@@ -597,6 +589,13 @@ export class PetPalRepository {
   private static normalizeBaseUrl(baseUrl: string): string {
     const normalized = baseUrl.trim();
     return normalized.endsWith('/') ? normalized.slice(0, normalized.length - 1) : normalized;
+  }
+
+  private static configureApiClient(): void {
+    PetPalApiClient.configure({
+      baseUrl: PetPalRepository.apiBaseUrl,
+      timeoutMs: 30000
+    });
   }
 
   private static communityReadAuthRequired(): boolean {

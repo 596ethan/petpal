@@ -21,11 +21,11 @@ import org.springframework.stereotype.Service;
 public class PetCommandService {
   private static final double MIN_WEIGHT = 0.01;
   private static final double MAX_WEIGHT = 999.99;
-  private static final String DEFAULT_DOG_AVATAR_URL = "https://loremflickr.com/320/320/dog?lock=9101";
-  private static final String DEFAULT_CAT_AVATAR_URL = "https://loremflickr.com/320/320/cat?lock=9102";
-  private static final String DEFAULT_RABBIT_AVATAR_URL = "https://loremflickr.com/320/320/rabbit?lock=9103";
-  private static final String DEFAULT_BIRD_AVATAR_URL = "https://loremflickr.com/320/320/bird?lock=9104";
-  private static final String DEFAULT_OTHER_AVATAR_URL = "https://loremflickr.com/320/320/pet?lock=9105";
+  private static final String DEFAULT_DOG_AVATAR_URL = "https://placehold.co/320x320/png?text=Dog";
+  private static final String DEFAULT_CAT_AVATAR_URL = "https://placehold.co/320x320/png?text=Cat";
+  private static final String DEFAULT_RABBIT_AVATAR_URL = "https://placehold.co/320x320/png?text=Rabbit";
+  private static final String DEFAULT_BIRD_AVATAR_URL = "https://placehold.co/320x320/png?text=Bird";
+  private static final String DEFAULT_OTHER_AVATAR_URL = "https://placehold.co/320x320/png?text=Pet";
 
   private final JdbcClient jdbcClient;
   private final PetQueryService petQueryService;

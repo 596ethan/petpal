@@ -7,7 +7,7 @@ import {
   UserProfile,
   VaccineRecord
 } from '../models/PetPalModels';
-import { PetPalHttpClient, PetPalHttpMethod } from './PetPalHttpClient';
+import { PetPalHttpClient, PetPalHttpError, PetPalHttpMethod } from './PetPalHttpClient';
 import { PetPalSessionSnapshot, PetPalSessionStore } from './PetPalSessionStore';
 
 export interface PetPalLoginRequest {
@@ -33,6 +33,11 @@ interface PetPalApiRequestOptions {
   headers?: Record<string, string>;
   timeoutMs?: number;
   query?: Record<string, string | number | boolean | undefined | null>;
+}
+
+export interface PetPalApiRawResponse {
+  statusCode: number;
+  rawBody: string;
 }
 
 interface PetPalApiEnvelope<T> {
@@ -165,20 +170,46 @@ export class PetPalApiClient {
     return PetPalApiClient.requestJson<T>(PetPalHttpMethod.DELETE, path);
   }
 
+  static async rawRequest(method: PetPalHttpMethod, path: string, options: PetPalApiRequestOptions = {}): Promise<PetPalApiRawResponse> {
+    const client = PetPalApiClient.requireClient();
+    try {
+      const response = await client.request<PetPalApiEnvelope<Object>>(method, path, {
+        auth: options.auth !== false,
+        body: options.body,
+        headers: options.headers,
+        timeoutMs: options.timeoutMs,
+        query: options.query
+      });
+      return {
+        statusCode: response.statusCode,
+        rawBody: response.rawBody
+      };
+    } catch (error) {
+      if (error instanceof PetPalHttpError && error.statusCode > 0) {
+        return {
+          statusCode: error.statusCode,
+          rawBody: error.rawBody
+        };
+      }
+      const message = error instanceof Error ? error.message : '请求失败';
+      throw new Error(message);
+    }
+  }
+
   private static async requestJson<T>(
     method: PetPalHttpMethod,
     path: string,
     options: PetPalApiRequestOptions = {}
   ): Promise<T> {
-    const client = PetPalApiClient.requireClient();
-    const response = await client.request<PetPalApiEnvelope<T>>(method, path, {
-      auth: options.auth !== false,
-      body: options.body,
-      headers: options.headers,
-      timeoutMs: options.timeoutMs,
-      query: options.query
-    });
-    return PetPalApiClient.unwrap(response.data);
+    const response = await PetPalApiClient.rawRequest(method, path, options);
+    const envelope = PetPalApiClient.parseEnvelope<T>(response.rawBody);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw new Error(envelope?.message ?? `HTTP ${response.statusCode}`);
+    }
+    if (envelope === null) {
+      throw new Error('服务器响应格式无效');
+    }
+    return PetPalApiClient.unwrap(envelope);
   }
 
   private static requireClient(): PetPalHttpClient {
@@ -193,6 +224,17 @@ export class PetPalApiClient {
       throw new Error(value.message);
     }
     return value.data;
+  }
+
+  private static parseEnvelope<T>(rawBody: string): PetPalApiEnvelope<T> | null {
+    if (rawBody.length === 0) {
+      return null;
+    }
+    try {
+      return JSON.parse(rawBody) as PetPalApiEnvelope<T>;
+    } catch {
+      return null;
+    }
   }
 
   private static mapUserProfile(profile: PetPalBackendUserProfilePayload): UserProfile {

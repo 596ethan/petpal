@@ -216,7 +216,7 @@ class PetPalServerMvcTest {
           """))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.code").value("OK"))
-      .andExpect(jsonPath("$.data.avatarUrl").value("https://loremflickr.com/320/320/dog?lock=9101"));
+      .andExpect(jsonPath("$.data.avatarUrl").value("https://placehold.co/320x320/png?text=Dog"));
   }
 
   @Test
