@@ -1,7 +1,7 @@
 # Post-MVP Quality Cleanup Plan
 
 > 计划日期：2026-04-22  
-> 状态：draft  
+> 状态：done  
 > 目标分支：`main`
 
 ## Owner
