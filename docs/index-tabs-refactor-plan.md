@@ -191,6 +191,45 @@ Manual smoke checks after implementation:
 - Manual smoke check passes or the remaining manual check is clearly stated.
 - `git status --short` is reviewed before final report.
 
+## Final Acceptance Record
+
+- Status: accepted
+- Acceptance date: 2026-04-23
+- Final branch: `main`
+- Final commit: `1454b51`
+- Merged branch: `codex/refactor/index-tabs`
+- Branch cleanup: local and remote `codex/refactor/index-tabs` deleted after merge
+
+Implemented files:
+
+- `Cutepetpost/entry/src/main/ets/pages/Index.ets`
+- `Cutepetpost/entry/src/main/ets/pages/index-tabs/HomeTab.ets`
+- `Cutepetpost/entry/src/main/ets/pages/index-tabs/CommunityTab.ets`
+- `Cutepetpost/entry/src/main/ets/pages/index-tabs/BookingTab.ets`
+- `Cutepetpost/entry/src/main/ets/pages/index-tabs/MineTab.ets`
+- `Cutepetpost/entry/src/main/ets/pages/index-tabs/IndexTabBar.ets`
+- `Cutepetpost/entry/src/main/ets/pages/index-tabs/IndexTabShared.ets`
+
+Verification results:
+
+- `hvigorw.js test --mode module -p module=entry@default -p product=default --no-daemon --no-parallel --no-incremental --analyze=false`: passed
+- `hvigorw.js assembleHap --mode module -p module=entry@default -p product=default --no-daemon --no-parallel --no-incremental --analyze=false`: passed
+- Manual verification reported by the user: passed
+
+Manual verification coverage:
+
+- four-tab switching and active tab visual state
+- Community composer opening
+- Community publish flow
+- like and unlike actions
+- Mine tab pet creation form opening
+- pet archive creation flow
+
+Notes:
+
+- No backend, repository, route, or API contract changes were made in this refactor.
+- The interaction regression found after the first extraction was fixed by switching extracted builders to `$$` parameter passing and direct parent object literals, so parent state changes refresh child tab UI correctly.
+
 ## Risks
 
 - ArkTS may reject callback or state-passing shapes that look valid in TypeScript. Keep inputs explicitly typed and compile early.
