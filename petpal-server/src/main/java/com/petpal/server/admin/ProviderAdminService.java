@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 public class ProviderAdminService {
   private static final String DEFAULT_COVER_URL = "https://placehold.co/800x400";
   private static final String DEFAULT_BUSINESS_HOURS = "09:00-20:00";
-  private static final String DEFAULT_STATUS = "ACTIVE";
+  private static final String DEFAULT_STATUS = "OPEN";
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
   private final ProviderQueryService providerQueryService;

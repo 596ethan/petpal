@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PetPal Admin</title>
+  <title>PetPal 管理后台</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -11,31 +11,31 @@
     <aside class="sidebar">
       <div>
         <p class="kicker">PetPal</p>
-        <h1>Admin Console</h1>
-        <p class="muted">Real HTTP controls for provider and appointment operations.</p>
+        <h1>管理后台</h1>
+        <p class="muted">面向机构和预约履约的真实接口操作台。</p>
       </div>
 
       <nav class="nav">
-        <button class="nav-item is-active" data-view="providers">Providers</button>
-        <button class="nav-item" data-view="services">Services</button>
-        <button class="nav-item" data-view="appointments">Appointments</button>
+        <button class="nav-item is-active" data-view="providers">机构管理</button>
+        <button class="nav-item" data-view="services">服务项目</button>
+        <button class="nav-item" data-view="appointments">预约处理</button>
       </nav>
 
       <div class="sidebar-card">
-        <span class="badge">HTTP API</span>
-        <p>Configure backend access for the real admin client.</p>
+        <span class="badge">接口配置</span>
+        <p>配置后台地址和开发管理令牌。</p>
         <form id="settings-form" class="sidebar-form">
           <label>
-            <span>API base URL</span>
+            <span>接口地址</span>
             <input id="api-base-url" type="url" placeholder="http://127.0.0.1:18080">
           </label>
           <label>
-            <span>Admin token</span>
-            <input id="admin-token" type="password" placeholder="Optional token">
+            <span>管理令牌</span>
+            <input id="admin-token" type="password" placeholder="可选令牌">
           </label>
-          <button type="submit" class="primary-button">Save settings</button>
+          <button type="submit" class="primary-button">保存配置</button>
         </form>
-        <p class="status-line" id="connection-status">Not connected</p>
+        <p class="status-line" id="connection-status">尚未连接</p>
       </div>
     </aside>
 
@@ -43,11 +43,11 @@
       <header class="topbar">
         <div>
           <p class="kicker">PetPal v1.0</p>
-          <h2 id="view-title">Provider Management</h2>
+          <h2 id="view-title">机构管理</h2>
         </div>
         <div class="topbar-actions">
-          <span class="status-pill" id="api-mode">Disconnected</span>
-          <button class="ghost-button" id="refresh-button">Refresh</button>
+          <span class="status-pill" id="api-mode">未连接</span>
+          <button class="ghost-button" id="refresh-button">刷新</button>
         </div>
       </header>
 
@@ -58,19 +58,19 @@
       <section class="panel view is-active" id="providers-view">
         <div class="panel-header">
           <div>
-            <h3>Providers</h3>
-            <p>Manage provider records backed by the server.</p>
+            <h3>机构</h3>
+            <p>维护后端真实保存的服务机构。</p>
           </div>
-          <button class="primary-button" id="add-provider-button">Add provider</button>
+          <button class="primary-button" id="add-provider-button">新增机构</button>
         </div>
 
         <div class="toolbar">
-          <input id="provider-search" type="search" placeholder="Search provider name or address">
+          <input id="provider-search" type="search" placeholder="搜索机构名称或地址">
           <select id="provider-status-filter">
-            <option value="ALL">All statuses</option>
-            <option value="OPEN">Open</option>
-            <option value="PAUSED">Paused</option>
-            <option value="OFFLINE">Offline</option>
+            <option value="ALL">全部状态</option>
+            <option value="OPEN">营业中</option>
+            <option value="PAUSED">暂停服务</option>
+            <option value="OFFLINE">已下线</option>
           </select>
         </div>
 
@@ -80,8 +80,8 @@
       <section class="panel view" id="services-view">
         <div class="panel-header">
           <div>
-            <h3>Service Groups</h3>
-            <p>Read-only service lists loaded from the backend.</p>
+            <h3>服务项目</h3>
+            <p>从后端读取的机构服务清单。</p>
           </div>
         </div>
         <div class="placeholder-grid" id="service-groups"></div>
@@ -90,19 +90,19 @@
       <section class="panel view" id="appointments-view">
         <div class="panel-header">
           <div>
-            <h3>Appointments</h3>
-            <p>Core workflow for confirm, complete, and cancel actions.</p>
+            <h3>预约</h3>
+            <p>处理确认、完成和取消等履约动作。</p>
           </div>
         </div>
 
         <div class="toolbar">
           <select id="appointment-status-filter">
-            <option value="ALL">All statuses</option>
-            <option value="PENDING_CONFIRM">Pending confirm</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="EXPIRED">Expired</option>
+            <option value="ALL">全部状态</option>
+            <option value="PENDING_CONFIRM">待确认</option>
+            <option value="CONFIRMED">已确认</option>
+            <option value="COMPLETED">已完成</option>
+            <option value="CANCELLED">已取消</option>
+            <option value="EXPIRED">已过期</option>
           </select>
         </div>
 
@@ -110,13 +110,13 @@
           <table>
             <thead>
               <tr>
-                <th>Order</th>
-                <th>User / Pet</th>
-                <th>Provider / Service</th>
-                <th>Time</th>
-                <th>Status</th>
-                <th>Remark</th>
-                <th>Actions</th>
+                <th>订单号</th>
+                <th>用户 / 宠物</th>
+                <th>机构 / 服务</th>
+                <th>时间</th>
+                <th>状态</th>
+                <th>备注</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody id="appointment-list"></tbody>
@@ -130,54 +130,54 @@
     <form id="provider-form" method="dialog" class="dialog-card">
       <div class="dialog-header">
         <div>
-          <p class="kicker">Provider</p>
-          <h3 id="provider-dialog-title">Add provider</h3>
+          <p class="kicker">机构</p>
+          <h3 id="provider-dialog-title">新增机构</h3>
         </div>
-        <button type="button" class="icon-button" id="close-provider-dialog">x</button>
+        <button type="button" class="icon-button" id="close-provider-dialog">×</button>
       </div>
 
       <div class="form-grid">
         <label>
-          <span>Name</span>
+          <span>名称</span>
           <input name="name" required maxlength="32">
         </label>
         <label>
-          <span>Type</span>
+          <span>类型</span>
           <select name="type" required>
-            <option value="HOSPITAL">Hospital</option>
-            <option value="GROOMING">Grooming</option>
-            <option value="BOARDING">Boarding</option>
+            <option value="HOSPITAL">医疗</option>
+            <option value="GROOMING">美容</option>
+            <option value="BOARDING">寄养</option>
           </select>
         </label>
         <label>
-          <span>Phone</span>
+          <span>电话</span>
           <input name="phone" required maxlength="20">
         </label>
         <label>
-          <span>Status</span>
+          <span>状态</span>
           <select name="status" required>
-            <option value="OPEN">Open</option>
-            <option value="PAUSED">Paused</option>
-            <option value="OFFLINE">Offline</option>
+            <option value="OPEN">营业中</option>
+            <option value="PAUSED">暂停服务</option>
+            <option value="OFFLINE">已下线</option>
           </select>
         </label>
         <label class="wide">
-          <span>Address</span>
+          <span>地址</span>
           <input name="address" required maxlength="64">
         </label>
         <label>
-          <span>Rating</span>
+          <span>评分</span>
           <input name="rating" type="number" min="0" max="5" step="0.1" required>
         </label>
         <label>
-          <span>Business hours</span>
+          <span>营业时间</span>
           <input name="businessHours" required maxlength="32">
         </label>
       </div>
 
       <div class="dialog-actions">
-        <button type="button" class="ghost-button" id="cancel-provider-dialog">Cancel</button>
-        <button type="submit" class="primary-button">Save</button>
+        <button type="button" class="ghost-button" id="cancel-provider-dialog">取消</button>
+        <button type="submit" class="primary-button">保存</button>
       </div>
     </form>
   </dialog>

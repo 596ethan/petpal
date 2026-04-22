@@ -16,9 +16,7 @@ import com.petpal.server.pet.dto.PetDto;
 import com.petpal.server.pet.dto.VaccineRecordDto;
 import com.petpal.server.user.dto.UserProfileDto;
 import java.util.List;
-import org.springframework.stereotype.Component;
 
-@Component
 public class DemoDataStore {
   public List<UserProfileDto> users() {
     return List.of(

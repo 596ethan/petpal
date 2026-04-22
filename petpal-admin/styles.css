@@ -16,7 +16,7 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", "PingFang SC", sans-serif;
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "HarmonyOS Sans SC", sans-serif;
   background: linear-gradient(180deg, #fbf7ef 0%, var(--bg) 100%);
   color: var(--ink);
 }

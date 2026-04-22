@@ -48,9 +48,30 @@ const els = {
 };
 
 const viewTitles = {
-  providers: 'Provider Management',
-  services: 'Service Groups',
-  appointments: 'Appointment Operations'
+  providers: '机构管理',
+  services: '服务项目',
+  appointments: '预约处理'
+};
+
+const providerTypeLabels = {
+  HOSPITAL: '医疗',
+  GROOMING: '美容',
+  BOARDING: '寄养'
+};
+
+const providerStatusLabels = {
+  ACTIVE: '营业中',
+  OPEN: '营业中',
+  PAUSED: '暂停服务',
+  OFFLINE: '已下线'
+};
+
+const appointmentStatusLabels = {
+  PENDING_CONFIRM: '待确认',
+  CONFIRMED: '已确认',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+  EXPIRED: '已过期'
 };
 
 function loadSettings() {
@@ -111,9 +132,9 @@ function setLoading(loading) {
 function renderConnectionStatus() {
   const baseUrl = normalizeBaseUrl(state.settings.baseUrl);
   els.connectionStatus.textContent = state.settings.adminToken
-    ? `Configured for ${baseUrl} with admin token`
-    : `Configured for ${baseUrl} without admin token`;
-  els.apiMode.textContent = state.loading ? 'Syncing' : 'Ready';
+    ? `已配置 ${baseUrl}，将携带管理令牌`
+    : `已配置 ${baseUrl}，未填写管理令牌`;
+  els.apiMode.textContent = state.loading ? '同步中' : '就绪';
 }
 
 function renderViews() {
@@ -128,12 +149,12 @@ function renderViews() {
 
 function renderMetrics() {
   const pendingCount = state.appointments.filter((item) => item.status === 'PENDING_CONFIRM').length;
-  const openCount = state.providers.filter((item) => item.status === 'OPEN').length;
+  const openCount = state.providers.filter((item) => normalizeProviderStatus(item.status) === 'OPEN').length;
   els.metrics.innerHTML = [
-    metricCard('Providers', state.providers.length),
-    metricCard('Open today', openCount),
-    metricCard('Pending', pendingCount),
-    metricCard('Appointments', state.appointments.length)
+    metricCard('机构数', state.providers.length),
+    metricCard('营业中', openCount),
+    metricCard('待确认', pendingCount),
+    metricCard('预约数', state.appointments.length)
   ].join('');
 }
 
@@ -142,23 +163,27 @@ function metricCard(label, value) {
 }
 
 function providerStatusChip(status) {
-  return `<span class="chip">${status}</span>`;
+  return `<span class="chip">${providerStatusLabels[status] || status}</span>`;
+}
+
+function normalizeProviderStatus(status) {
+  return status === 'ACTIVE' ? 'OPEN' : status;
 }
 
 function appointmentActions(item) {
   if (item.status === 'PENDING_CONFIRM') {
     return [
-      actionButton(item.id, 'CONFIRMED', 'Confirm'),
-      actionButton(item.id, 'CANCELLED', 'Cancel')
+      actionButton(item.id, 'CONFIRMED', '确认'),
+      actionButton(item.id, 'CANCELLED', '取消')
     ].join('');
   }
   if (item.status === 'CONFIRMED') {
     return [
-      actionButton(item.id, 'COMPLETED', 'Complete'),
-      actionButton(item.id, 'CANCELLED', 'Cancel')
+      actionButton(item.id, 'COMPLETED', '完成'),
+      actionButton(item.id, 'CANCELLED', '取消')
     ].join('');
   }
-  return '<span class="muted-inline">No actions</span>';
+  return '<span class="muted-inline">无可用操作</span>';
 }
 
 function actionButton(id, status, label) {
@@ -167,11 +192,11 @@ function actionButton(id, status, label) {
 
 function openProviderDialog(provider) {
   state.editingProviderId = provider?.id ?? null;
-  els.providerDialogTitle.textContent = provider ? 'Edit provider' : 'Add provider';
+  els.providerDialogTitle.textContent = provider ? '编辑机构' : '新增机构';
   els.providerForm.name.value = provider?.name ?? '';
   els.providerForm.type.value = provider?.type ?? 'HOSPITAL';
   els.providerForm.phone.value = provider?.phone ?? '';
-  els.providerForm.status.value = provider?.status ?? 'OPEN';
+  els.providerForm.status.value = normalizeProviderStatus(provider?.status ?? 'OPEN');
   els.providerForm.address.value = provider?.address ?? '';
   els.providerForm.rating.value = provider?.rating ?? '4.5';
   els.providerForm.businessHours.value = provider?.businessHours ?? '09:00-20:00';
@@ -208,10 +233,10 @@ async function requestJson(path, options = {}) {
     throw new Error(message);
   }
   if (!payload) {
-    throw new Error('Empty server response');
+    throw new Error('服务器响应为空');
   }
   if (payload.code && payload.code !== 'OK') {
-    throw new Error(payload.message || 'Request failed');
+    throw new Error(payload.message || '请求失败');
   }
   return Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
 }
@@ -288,7 +313,7 @@ function emptyState(message) {
 async function renderProviders() {
   const filtered = state.providers.filter((item) => {
     const matchesSearch = `${item.name} ${item.address}`.toLowerCase().includes(state.providerSearch.toLowerCase());
-    const matchesStatus = state.providerStatus === 'ALL' || item.status === state.providerStatus;
+    const matchesStatus = state.providerStatus === 'ALL' || normalizeProviderStatus(item.status) === state.providerStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -303,17 +328,17 @@ async function renderProviders() {
           ${providerStatusChip(item.status)}
         </header>
         <div class="meta">
-          <span class="chip">${item.type}</span>
-          <span class="chip">Rating ${item.rating}</span>
+          <span class="chip">${providerTypeLabels[item.type] || item.type}</span>
+          <span class="chip">评分 ${item.rating}</span>
           <span class="chip">${item.businessHours}</span>
         </div>
-        <p>${item.phone || 'No phone'}</p>
+        <p>${item.phone || '未填写电话'}</p>
         <div class="actions">
-          <button class="ghost-button" data-action="edit-provider" data-id="${item.id}">Edit</button>
+          <button class="ghost-button" data-action="edit-provider" data-id="${item.id}">编辑</button>
         </div>
       </article>
     `).join('')
-    : emptyState('No providers found');
+    : emptyState('未找到机构');
 }
 
 async function renderServiceGroups() {
@@ -322,14 +347,14 @@ async function renderServiceGroups() {
       <article class="service-card">
         <header>
           <h4>${group.providerName}</h4>
-          <span class="chip">/api/provider/${group.providerId}/services</span>
+          <span class="chip">机构编号 ${group.providerId}</span>
         </header>
         <ul>
-          ${group.services.map((service) => `<li>${service.name} - RMB ${service.price} - ${service.durationMinutes} min</li>`).join('')}
+          ${group.services.map((service) => `<li>${service.name} - ￥${service.price} - ${service.durationMinutes} 分钟</li>`).join('')}
         </ul>
       </article>
     `).join('')
-    : emptyState('No service groups found');
+    : emptyState('未找到服务项目');
 }
 
 async function renderAppointments() {
@@ -338,15 +363,15 @@ async function renderAppointments() {
     ? filtered.map((item) => `
       <tr>
         <td>${item.orderNo}</td>
-        <td>User #${item.userId}<br>${item.petName}</td>
+        <td>用户 ${item.userId}<br>${item.petName}</td>
         <td>${item.providerName}<br>${item.serviceName}</td>
         <td>${item.appointmentTime}</td>
-        <td><span class="chip">${item.status}</span></td>
+        <td><span class="chip">${appointmentStatusLabels[item.status] || item.status}</span></td>
         <td>${item.remark || ''}</td>
         <td class="actions">${appointmentActions(item)}</td>
       </tr>
     `).join('')
-    : `<tr><td colspan="7">${emptyStateText('No appointments found')}</td></tr>`;
+    : `<tr><td colspan="7">${emptyStateText('未找到预约')}</td></tr>`;
 }
 
 function emptyStateText(message) {
@@ -361,19 +386,19 @@ async function refreshAll() {
   try {
     await loadProviders();
   } catch (error) {
-    errors.push(`Providers: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`机构：${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
     await loadAppointments();
   } catch (error) {
-    errors.push(`Appointments: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`预约：${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
     await loadServiceGroups();
   } catch (error) {
-    errors.push(`Services: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`服务：${error instanceof Error ? error.message : String(error)}`);
   }
 
   renderMetrics();
@@ -383,7 +408,7 @@ async function refreshAll() {
   if (errors.length > 0) {
     setBanner(errors.join(' | '), 'error');
   } else {
-    setBanner(`Connected to ${normalizeBaseUrl(state.settings.baseUrl)}`, 'success');
+    setBanner(`已连接到 ${normalizeBaseUrl(state.settings.baseUrl)}`, 'success');
   }
 
   setLoading(false);
@@ -471,7 +496,7 @@ els.appointmentList.addEventListener('click', async (event) => {
   try {
     setBanner('', 'info');
     await updateAppointmentStatus(Number(target.dataset.id), target.dataset.status);
-    setBanner(`Appointment ${target.dataset.id} updated to ${target.dataset.status}`, 'success');
+    setBanner(`预约 ${target.dataset.id} 已更新为 ${appointmentStatusLabels[target.dataset.status] || target.dataset.status}`, 'success');
   } catch (error) {
     setBanner(error instanceof Error ? error.message : String(error), 'error');
   }
@@ -495,7 +520,7 @@ els.providerForm.addEventListener('submit', async (event) => {
     await saveProvider(payload);
     els.providerDialog.close();
     state.editingProviderId = null;
-    setBanner('Provider saved', 'success');
+    setBanner('机构已保存', 'success');
     await refreshAll();
   } catch (error) {
     setBanner(error instanceof Error ? error.message : String(error), 'error');

@@ -19,10 +19,10 @@ spring:
 
 petpal:
   admin:
-    token: petpal-admin-token-change-me
+    token: ${PETPAL_ADMIN_TOKEN:petpal-admin-token-change-me}
   jwt:
     issuer: petpal
-    secret: petpal-phone-mvp-secret-key-please-change
+    secret: ${PETPAL_JWT_SECRET:petpal-phone-mvp-secret-key-please-change}
     access-expire-seconds: 7200
     refresh-expire-seconds: 604800
   storage:

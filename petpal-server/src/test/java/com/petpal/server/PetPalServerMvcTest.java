@@ -74,7 +74,7 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.code").value("OK"))
       .andExpect(jsonPath("$.data.profile.phone").value("13800000001"))
-      .andExpect(jsonPath("$.data.profile.nickname").value("Xiaoman"))
+      .andExpect(jsonPath("$.data.profile.nickname").value("小满"))
       .andExpect(jsonPath("$.data.tokens.accessToken").isString())
       .andExpect(jsonPath("$.data.tokens.refreshToken").isString());
   }
@@ -164,7 +164,7 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.code").value("OK"))
       .andExpect(jsonPath("$.data.length()").value(greaterThan(0)))
-      .andExpect(jsonPath("$.data[0].name").value("Cloud Vet Center"))
+      .andExpect(jsonPath("$.data[0].name").value("云朵宠物医院"))
       .andExpect(jsonPath("$.data[0].type").value("HOSPITAL"));
   }
 
@@ -248,23 +248,23 @@ class PetPalServerMvcTest {
         .contentType(MediaType.APPLICATION_JSON)
         .content("""
           {
-            "name": "Nuomi Updated",
+            "name": "糯米更新",
             "weight": 4.80
           }
           """))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.data.name").value("Nuomi Updated"))
+      .andExpect(jsonPath("$.data.name").value("糯米更新"))
       .andExpect(jsonPath("$.data.species").value("CAT"))
-      .andExpect(jsonPath("$.data.breed").value("British Shorthair"))
+      .andExpect(jsonPath("$.data.breed").value("英短"))
       .andExpect(jsonPath("$.data.gender").value("FEMALE"))
       .andExpect(jsonPath("$.data.weight").value(4.8));
 
     mockMvc.perform(get("/api/pet/1")
         .header("Authorization", "Bearer " + accessToken))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.data.name").value("Nuomi Updated"))
+      .andExpect(jsonPath("$.data.name").value("糯米更新"))
       .andExpect(jsonPath("$.data.species").value("CAT"))
-      .andExpect(jsonPath("$.data.breed").value("British Shorthair"));
+      .andExpect(jsonPath("$.data.breed").value("英短"));
   }
 
   @Test
@@ -446,7 +446,7 @@ class PetPalServerMvcTest {
             "vaccineName": "First same day",
             "vaccinatedAt": "2026-08-01",
             "nextDueAt": "2027-08-01",
-            "hospital": "Cloud Vet Center"
+            "hospital": "云朵宠物医院"
           }
           """))
       .andExpect(status().isOk())
@@ -460,7 +460,7 @@ class PetPalServerMvcTest {
             "vaccineName": "Second same day",
             "vaccinatedAt": "2026-08-01",
             "nextDueAt": "2027-08-01",
-            "hospital": "Cloud Vet Center"
+            "hospital": "云朵宠物医院"
           }
           """))
       .andExpect(status().isOk())
@@ -500,8 +500,8 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.data.orderNo").exists())
       .andExpect(jsonPath("$.data.status").value("PENDING_CONFIRM"))
-      .andExpect(jsonPath("$.data.petName").value("Nuomi"))
-      .andExpect(jsonPath("$.data.providerName").value("Cloud Vet Center"));
+      .andExpect(jsonPath("$.data.petName").value("糯米"))
+      .andExpect(jsonPath("$.data.providerName").value("云朵宠物医院"));
   }
 
   @Test

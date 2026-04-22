@@ -31,7 +31,8 @@ CREATE TABLE pet (
   is_neutered TINYINT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0
+  deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_pet_owner_deleted (owner_id, deleted)
 );
 
 CREATE TABLE pet_health_record (
@@ -42,7 +43,8 @@ CREATE TABLE pet_health_record (
   description VARCHAR(255),
   record_date DATE NOT NULL,
   next_date DATE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_pet_health_pet_record (pet_id, record_date, id)
 );
 
 CREATE TABLE pet_vaccine (
@@ -52,7 +54,8 @@ CREATE TABLE pet_vaccine (
   vaccinated_at DATE NOT NULL,
   next_due_at DATE,
   hospital VARCHAR(100),
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_pet_vaccine_pet_date (pet_id, vaccinated_at, id)
 );
 
 CREATE TABLE post (
@@ -66,7 +69,9 @@ CREATE TABLE post (
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0
+  deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_post_user_status (user_id, status, deleted),
+  KEY idx_post_feed (deleted, status, created_at, id)
 );
 
 CREATE TABLE post_image (
@@ -74,7 +79,8 @@ CREATE TABLE post_image (
   post_id BIGINT NOT NULL,
   image_url VARCHAR(1024) NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_post_image_post_sort (post_id, sort_order)
 );
 
 CREATE TABLE post_like (
@@ -91,7 +97,8 @@ CREATE TABLE comment (
   parent_id BIGINT,
   user_id BIGINT NOT NULL,
   content VARCHAR(200) NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_comment_post_parent_created (post_id, parent_id, created_at, id)
 );
 
 CREATE TABLE service_provider (
@@ -103,7 +110,7 @@ CREATE TABLE service_provider (
   rating DECIMAL(2,1) NOT NULL DEFAULT 5.0,
   cover_url VARCHAR(255),
   business_hours VARCHAR(100),
-  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+  status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0
@@ -117,7 +124,8 @@ CREATE TABLE service_item (
   duration INT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0
+  deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_service_item_provider_deleted (provider_id, deleted)
 );
 
 CREATE TABLE appointment (
@@ -133,7 +141,9 @@ CREATE TABLE appointment (
   cancel_reason VARCHAR(255),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0
+  deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_appointment_user_deleted (user_id, deleted, appointment_time),
+  KEY idx_appointment_provider_status (provider_id, status, appointment_time)
 );
 
 CREATE TABLE service_review (
