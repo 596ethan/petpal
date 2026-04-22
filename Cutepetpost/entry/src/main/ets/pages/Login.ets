@@ -14,8 +14,8 @@ function LoginChip(label: string) {
 @Entry
 @Component
 struct Login {
-  @State phone: string = '13800000001'
-  @State password: string = '123456'
+  @State phone: string = ''
+  @State password: string = ''
   @State loading: boolean = false
   @State errorMessage: string = ''
 
@@ -52,7 +52,7 @@ struct Login {
     Scroll() {
       Column({ space: 22 }) {
         Column({ space: 16 }) {
-          LoginChip('PetPal Chronicle')
+          LoginChip('宠物日记')
           Text('欢迎回到\n你和宠物共同生活的笔记本')
             .fontSize(34)
             .fontWeight(FontWeight.Bold)

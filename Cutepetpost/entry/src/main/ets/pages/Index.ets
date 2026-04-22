@@ -298,8 +298,9 @@ struct Index {
   }
 
   private uploadInputFromUri(uri: string): FileUploadInput {
-    const file = fs.openSync(uri, fs.OpenMode.READ_ONLY)
+    let file: fs.File | null = null
     try {
+      file = fs.openSync(uri, fs.OpenMode.READ_ONLY)
       const stat = fs.statSync(file.fd)
       const data = new ArrayBuffer(stat.size)
       fs.readSync(file.fd, data)
@@ -308,8 +309,16 @@ struct Index {
         contentType: this.contentTypeFromUri(uri),
         data: data
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`读取图片失败：${message}`)
     } finally {
-      fs.closeSync(file)
+      if (file !== null) {
+        try {
+          fs.closeSync(file)
+        } catch {
+        }
+      }
     }
   }
 
@@ -358,7 +367,7 @@ struct Index {
       if (petIdText.length > 0) {
         const petId = Number(petIdText)
         if (petId !== petId || petId <= 0) {
-          throw new Error('Pet ID must be a positive number.')
+          throw new Error('宠物 ID 必须是正整数')
         }
         input.petId = petId
       }
@@ -590,7 +599,7 @@ struct Index {
         .onChange((value: string) => {
           this.postContent = value
         })
-      TextInput({ text: this.postPetIdText, placeholder: '宠物 ID（可选）' })
+      TextInput({ text: this.postPetIdText, placeholder: '宠物编号（可选）' })
         .height(48)
         .backgroundColor(PetPalTheme.surface)
         .borderRadius(PetPalTheme.radiusImage)
@@ -778,7 +787,7 @@ struct Index {
         })
       }
       Row({ space: 10 }) {
-        TextInput({ text: this.createPetBirthday, placeholder: '生日 yyyy-MM-dd，可选' })
+        TextInput({ text: this.createPetBirthday, placeholder: '生日（如 2026-04-21，可选）' })
           .height(50)
           .backgroundColor(PetPalTheme.surface)
           .borderRadius(PetPalTheme.radiusImage)
@@ -787,7 +796,7 @@ struct Index {
           .onChange((value: string) => {
             this.createPetBirthday = value
           })
-        TextInput({ text: this.createPetWeight, placeholder: '体重 kg，可选' })
+        TextInput({ text: this.createPetWeight, placeholder: '体重（千克，可选）' })
           .height(50)
           .backgroundColor(PetPalTheme.surface)
           .borderRadius(PetPalTheme.radiusImage)
@@ -797,7 +806,7 @@ struct Index {
             this.createPetWeight = value
           })
       }
-      TextInput({ text: this.createPetAvatarUrl, placeholder: '头像 URL，可选' })
+      TextInput({ text: this.createPetAvatarUrl, placeholder: '头像链接（可选）' })
         .height(50)
         .backgroundColor(PetPalTheme.surface)
         .borderRadius(PetPalTheme.radiusImage)
@@ -883,7 +892,7 @@ struct Index {
   HomeHero() {
     Stack({ alignContent: Alignment.TopEnd }) {
       Column({ space: 16 }) {
-        CapsuleChip('PetPal Chronicle', 'rgba(255, 248, 243, 0.14)', '#FFF7EF')
+        CapsuleChip('宠物日记', 'rgba(255, 248, 243, 0.14)', '#FFF7EF')
         Text('把每一次\n照护与陪伴慢慢写下来')
           .fontSize(34)
           .fontWeight(FontWeight.Bold)
@@ -902,7 +911,7 @@ struct Index {
             .onClick(() => {
               this.currentTab = 1;
             })
-          Button('登录 PetPal')
+          Button('登录进入')
             .height(46)
             .fontSize(14)
             .fontColor('#FFF8F3')

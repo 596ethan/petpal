@@ -23,16 +23,8 @@ import {
   UserProfile,
   VaccineRecord
 } from '../models/PetPalModels';
-import {
-  appointments,
-  currentUser,
-  healthRecords,
-  pets,
-  providers,
-  serviceItems,
-  vaccineRecords
-} from '../data/MockPetPalData';
 import { PETPAL_API_BASE_URL } from '../config/PetPalAppConfig';
+import { PetPalHttpClient, PetPalHttpError, PetPalHttpMethod } from '../services/PetPalHttpClient';
 import { PetPalSessionSnapshot, PetPalSessionStore } from '../services/PetPalSessionStore';
 
 export interface LoginSession {
@@ -168,6 +160,15 @@ interface LoginRequestPayload {
   password: string;
 }
 
+const EMPTY_USER_PROFILE: UserProfile = {
+  id: 0,
+  nickname: '',
+  bio: '',
+  avatarUrl: '',
+  followingCount: 0,
+  followerCount: 0
+};
+
 export interface PetPalRepositoryRequest {
   path: string;
   method: http.RequestMethod;
@@ -209,7 +210,7 @@ export class PetPalRepository {
     if (PetPalRepository.session !== null) {
       return PetPalRepository.session.profile;
     }
-    return currentUser;
+    return EMPTY_USER_PROFILE;
   }
 
   static getSession(): LoginSession | null {
@@ -247,22 +248,22 @@ export class PetPalRepository {
   }
 
   static getPets(): Pet[] {
-    return pets;
+    return [];
   }
 
   static getPetById(id: number): Pet {
-    const pet = pets.find((item: Pet) => item.id === id);
-    return pet ?? pets[0];
+    void id;
+    throw new Error('宠物档案需要从后端加载');
   }
 
   static getHealthRecords(petId: number): HealthRecord[] {
     void petId;
-    return healthRecords;
+    return [];
   }
 
   static getVaccines(petId: number): VaccineRecord[] {
     void petId;
-    return vaccineRecords;
+    return [];
   }
 
   static getPosts(): Post[] {
@@ -279,20 +280,21 @@ export class PetPalRepository {
   }
 
   static getProviders(): ServiceProvider[] {
-    return providers;
+    return [];
   }
 
   static getProviderById(id: number): ServiceProvider {
-    const provider = providers.find((item: ServiceProvider) => item.id === id);
-    return provider ?? providers[0];
+    void id;
+    throw new Error('服务机构需要从后端加载');
   }
 
   static getServices(providerId: number): ServiceItem[] {
-    return serviceItems.filter((item: ServiceItem) => item.providerId === providerId);
+    void providerId;
+    return [];
   }
 
   static getAppointments(): Appointment[] {
-    return appointments;
+    return [];
   }
 
   static async login(phone: string, password: string): Promise<LoginSession> {
@@ -530,13 +532,18 @@ export class PetPalRepository {
     extraHeaders?: Record<string, string>
   ): Promise<T> {
     let headers: Record<string, string> = {
+      'Accept': 'application/json',
       'Content-Type': 'application/json'
     };
     if (authRequired && PetPalRepository.session !== null) {
       headers.Authorization = `Bearer ${PetPalRepository.session.accessToken}`;
     }
-    if (extraHeaders?.['Content-Type'] !== undefined) {
-      headers['Content-Type'] = extraHeaders['Content-Type'];
+    if (extraHeaders !== undefined) {
+      const keys = Object.keys(extraHeaders);
+      for (let index = 0; index < keys.length; index++) {
+        const key = keys[index];
+        headers[key] = extraHeaders[key];
+      }
     }
 
     if (PetPalRepository.testRequestHandler !== null) {
@@ -550,54 +557,24 @@ export class PetPalRepository {
       return PetPalRepository.parseResponse<T>(response.responseCode, response.result, authRequired);
     }
 
-    const request = http.createHttp();
+    const client = new PetPalHttpClient(PetPalRepository.apiBaseUrl, 30000);
     try {
-      let options: http.HttpRequestOptions = {
-        method: method,
-        header: headers,
-        connectTimeout: 30000,
-        readTimeout: 30000,
-        expectDataType: http.HttpDataType.STRING,
-        usingCache: false
-      };
-      if (body !== undefined) {
-        options.extraData = PetPalRepository.serializeBody(body) as string | Object | ArrayBuffer;
-      }
-      let response: http.HttpResponse;
-      try {
-        response = await request.request(`${PetPalRepository.apiBaseUrl}${path}`, options);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Request failed';
-        throw new Error(message);
-      }
-      const raw = String(response.result);
-      let envelope: BackendEnvelope<T> | null = null;
-      try {
-        envelope = JSON.parse(raw) as BackendEnvelope<T>;
-      } catch {
-        envelope = null;
-      }
-
-      if (response.responseCode === 401 || response.responseCode === 403) {
-        if (authRequired) {
-          await PetPalRepository.clearPersistedSession();
-          throw new Error(envelope?.message ?? '登录已失效，请重新登录');
+      const response = await client.request<BackendEnvelope<T>>(PetPalRepository.toPetPalHttpMethod(method), path, {
+        auth: false,
+        headers: headers,
+        body: body,
+        timeoutMs: 30000
+      });
+      return PetPalRepository.parseResponse<T>(response.statusCode, response.rawBody, authRequired);
+    } catch (error) {
+      if (error instanceof PetPalHttpError) {
+        if (error.statusCode > 0 || error.rawBody.length > 0) {
+          return PetPalRepository.parseResponse<T>(error.statusCode, error.rawBody, authRequired);
         }
-        throw new Error(envelope?.message ?? '登录失败，请检查账号密码');
+        throw new Error(error.message.length > 0 ? error.message : '请求失败');
       }
-
-      if (response.responseCode < 200 || response.responseCode >= 300) {
-        throw new Error(envelope?.message ?? `HTTP ${response.responseCode}`);
-      }
-      if (envelope === null) {
-        throw new Error('Invalid server response');
-      }
-      if (envelope.code !== 'OK') {
-        throw new Error(envelope.message);
-      }
-      return envelope.data;
-    } finally {
-      request.destroy();
+      const message = error instanceof Error ? error.message : '请求失败';
+      throw new Error(message);
     }
   }
 
@@ -621,7 +598,7 @@ export class PetPalRepository {
       throw new Error(envelope?.message ?? `HTTP ${responseCode}`);
     }
     if (envelope === null) {
-      throw new Error('Invalid server response');
+      throw new Error('服务器响应格式无效');
     }
     if (envelope.code !== 'OK') {
       throw new Error(envelope.message);
@@ -634,16 +611,22 @@ export class PetPalRepository {
     return normalized.endsWith('/') ? normalized.slice(0, normalized.length - 1) : normalized;
   }
 
-  private static serializeBody(body: Object | string | ArrayBuffer): string | Object | ArrayBuffer {
-    if (typeof body === 'string' || body instanceof ArrayBuffer) {
-      return body;
-    }
-    return JSON.stringify(body);
-  }
-
   private static communityReadAuthRequired(): boolean {
     PetPalRepository.hydrateSessionFromStore();
     return PetPalRepository.session !== null;
+  }
+
+  private static toPetPalHttpMethod(method: http.RequestMethod): PetPalHttpMethod {
+    if (method === http.RequestMethod.POST) {
+      return PetPalHttpMethod.POST;
+    }
+    if (method === http.RequestMethod.PUT) {
+      return PetPalHttpMethod.PUT;
+    }
+    if (method === http.RequestMethod.DELETE) {
+      return PetPalHttpMethod.DELETE;
+    }
+    return PetPalHttpMethod.GET;
   }
 
   private static upsertPostCache(post: Post): void {
@@ -671,12 +654,37 @@ export class PetPalRepository {
   }
 
   private static encodeUtf8(value: string): ArrayBuffer {
-    const bytes = new Uint8Array(value.length);
+    const bytes: number[] = [];
     for (let i = 0; i < value.length; i++) {
-      const code = value.charCodeAt(i);
-      bytes[i] = code <= 0x7F ? code : 95;
+      let code = value.charCodeAt(i);
+      if (code >= 0xD800 && code <= 0xDBFF && i + 1 < value.length) {
+        const next = value.charCodeAt(i + 1);
+        if (next >= 0xDC00 && next <= 0xDFFF) {
+          code = 0x10000 + (code - 0xD800) * 0x400 + (next - 0xDC00);
+          i += 1;
+        }
+      }
+      if (code <= 0x7F) {
+        bytes.push(code);
+      } else if (code <= 0x7FF) {
+        bytes.push(0xC0 + Math.floor(code / 0x40));
+        bytes.push(0x80 + code % 0x40);
+      } else if (code <= 0xFFFF) {
+        bytes.push(0xE0 + Math.floor(code / 0x1000));
+        bytes.push(0x80 + Math.floor(code / 0x40) % 0x40);
+        bytes.push(0x80 + code % 0x40);
+      } else {
+        bytes.push(0xF0 + Math.floor(code / 0x40000));
+        bytes.push(0x80 + Math.floor(code / 0x1000) % 0x40);
+        bytes.push(0x80 + Math.floor(code / 0x40) % 0x40);
+        bytes.push(0x80 + code % 0x40);
+      }
     }
-    return bytes.buffer;
+    const encoded = new Uint8Array(bytes.length);
+    for (let index = 0; index < bytes.length; index++) {
+      encoded[index] = bytes[index];
+    }
+    return encoded.buffer;
   }
 
   private static escapeMultipartValue(value: string): string {
@@ -696,7 +704,7 @@ export class PetPalRepository {
     PetPalRepository.session = {
       accessToken: snapshot.accessToken,
       refreshToken: snapshot.refreshToken ?? '',
-      profile: snapshot.userProfile ?? currentUser
+      profile: snapshot.userProfile ?? EMPTY_USER_PROFILE
     };
   }
 

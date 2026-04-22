@@ -5,7 +5,8 @@ import { PetPalSessionStore } from './PetPalSessionStore';
 export enum PetPalHttpMethod {
   GET = 'GET',
   POST = 'POST',
-  PUT = 'PUT'
+  PUT = 'PUT',
+  DELETE = 'DELETE'
 }
 
 export interface PetPalHttpRequestOptions {
@@ -57,6 +58,10 @@ export class PetPalHttpClient {
     return this.request<T>(PetPalHttpMethod.PUT, path, options);
   }
 
+  async delete<T>(path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
+    return this.request<T>(PetPalHttpMethod.DELETE, path, options);
+  }
+
   async request<T>(method: PetPalHttpMethod, path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
     const request = http.createHttp();
     const url = this.buildUrl(path, options.query);
@@ -94,7 +99,7 @@ export class PetPalHttpClient {
       if (error instanceof PetPalHttpError) {
         throw error;
       }
-      const message = error instanceof Error ? error.message : 'Request failed';
+      const message = error instanceof Error ? error.message : '请求失败';
       throw new PetPalHttpError(message, 0, '');
     } finally {
       request.destroy();
@@ -167,7 +172,7 @@ export class PetPalHttpClient {
       return result;
     }
     if (result instanceof ArrayBuffer) {
-      return this.decoder.decode(new Uint8Array(result));
+      return this.decoder.decodeToString(new Uint8Array(result));
     }
     return JSON.stringify(result);
   }
@@ -206,6 +211,9 @@ export class PetPalHttpClient {
     }
     if (method === PetPalHttpMethod.PUT) {
       return http.RequestMethod.PUT;
+    }
+    if (method === PetPalHttpMethod.DELETE) {
+      return http.RequestMethod.DELETE;
     }
     return http.RequestMethod.GET;
   }

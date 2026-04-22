@@ -1,4 +1,3 @@
-import promptAction from '@ohos.promptAction';
 import {
   HealthRecord,
   HealthRecordCreateInput,
@@ -253,7 +252,7 @@ struct PetDetail {
       this.deletingPet = true
       this.actionError = ''
       await PetPalRepository.deletePet(this.petId)
-      promptAction.showToast({ message: '已删除' })
+      this.getUIContext().getPromptAction().showToast({ message: '已删除' })
       this.getUIContext().getRouter().back()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -639,7 +638,7 @@ struct PetDetail {
         })
       }
       Row({ space: 10 }) {
-        TextInput({ text: this.editBirthday, placeholder: '生日 yyyy-MM-dd，可选' })
+        TextInput({ text: this.editBirthday, placeholder: '生日（如 2026-04-21，可选）' })
           .height(50)
           .backgroundColor(PetPalTheme.surface)
           .borderRadius(PetPalTheme.radiusImage)
@@ -648,7 +647,7 @@ struct PetDetail {
           .onChange((value: string) => {
             this.editBirthday = value
           })
-        TextInput({ text: this.editWeight, placeholder: '体重 kg，可选' })
+        TextInput({ text: this.editWeight, placeholder: '体重（千克，可选）' })
           .height(50)
           .backgroundColor(PetPalTheme.surface)
           .borderRadius(PetPalTheme.radiusImage)
@@ -658,7 +657,7 @@ struct PetDetail {
             this.editWeight = value
           })
       }
-      TextInput({ text: this.editAvatarUrl, placeholder: '头像 URL，可选' })
+      TextInput({ text: this.editAvatarUrl, placeholder: '头像链接（可选）' })
         .height(50)
         .backgroundColor(PetPalTheme.surface)
         .borderRadius(PetPalTheme.radiusImage)

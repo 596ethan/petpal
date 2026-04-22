@@ -76,7 +76,7 @@ export class PetPalApiClient {
     const payload = await PetPalApiClient.requestJson<PetPalBackendLoginPayload>(PetPalHttpMethod.POST, '/user/login', options);
     const accessToken = payload.tokens.accessToken.trim();
     if (!accessToken) {
-      throw new Error('Login response did not include an access token.');
+      throw new Error('登录响应缺少访问令牌');
     }
 
     const refreshToken = payload.tokens.refreshToken.trim();
@@ -161,6 +161,10 @@ export class PetPalApiClient {
     return PetPalApiClient.requestJson<T>(PetPalHttpMethod.PUT, path, options);
   }
 
+  static async delete<T>(path: string): Promise<T> {
+    return PetPalApiClient.requestJson<T>(PetPalHttpMethod.DELETE, path);
+  }
+
   private static async requestJson<T>(
     method: PetPalHttpMethod,
     path: string,
@@ -179,7 +183,7 @@ export class PetPalApiClient {
 
   private static requireClient(): PetPalHttpClient {
     if (PetPalApiClient.client === null) {
-      throw new Error('PetPalApiClient is not configured. Call PetPalApiClient.configure(baseUrl) first.');
+      throw new Error('PetPalApiClient 尚未配置，请先调用 configure');
     }
     return PetPalApiClient.client;
   }

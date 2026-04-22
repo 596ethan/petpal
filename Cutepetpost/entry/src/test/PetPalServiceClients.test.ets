@@ -16,6 +16,7 @@ export default function petPalServiceClientsTest() {
       expect(PetPalHttpMethod.GET).assertEqual('GET');
       expect(PetPalHttpMethod.POST).assertEqual('POST');
       expect(PetPalHttpMethod.PUT).assertEqual('PUT');
+      expect(PetPalHttpMethod.DELETE).assertEqual('DELETE');
     });
   });
 }

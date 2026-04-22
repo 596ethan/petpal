@@ -93,12 +93,12 @@ struct ProviderDetail {
       return
     }
     if (this.appointmentTime.trim().length === 0) {
-      this.actionError = '请输入预约时间，格式如 2026-04-13T10:00:00'
+      this.actionError = '请输入预约时间，格式如 2026-04-13 10:00:00'
       return
     }
     const appointmentTime = this.normalizeAppointmentTime(this.appointmentTime.trim())
     if (appointmentTime.length === 0) {
-      this.actionError = '预约时间格式不正确，请使用 2026-04-13T10:00:00'
+      this.actionError = '预约时间格式不正确，请使用 2026-04-13 10:00:00'
       return
     }
     this.creating = true
@@ -133,7 +133,7 @@ struct ProviderDetail {
 
   private toAppointmentErrorMessage(message: string): string {
     if (message.includes('INVALID_APPOINTMENT_TIME')) {
-      return '预约时间格式不正确，请使用 2026-04-13T10:00:00'
+      return '预约时间格式不正确，请使用 2026-04-13 10:00:00'
     }
     if (message.includes('APPOINTMENT_TIME_IN_PAST')) {
       return '预约时间必须晚于当前时间'
@@ -315,7 +315,7 @@ struct ProviderDetail {
       Text('预约时间')
         .fontSize(12)
         .fontColor(PetPalTheme.textSubtle)
-      TextInput({ text: this.appointmentTime, placeholder: '例如 2026-04-13T10:00:00' })
+      TextInput({ text: this.appointmentTime, placeholder: '例如 2026-04-13 10:00:00' })
         .height(50)
         .backgroundColor(PetPalTheme.surfaceRaised)
         .borderRadius(18)
