@@ -4,11 +4,16 @@ import com.petpal.server.common.enums.PostVisibility;
 import com.petpal.server.common.error.AppException;
 import com.petpal.server.community.dto.PostCommentDto;
 import com.petpal.server.community.dto.PostDto;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -18,6 +23,8 @@ import org.springframework.stereotype.Service;
 public class CommunityQueryService {
   private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private static final Pattern TOPIC_PATTERN = Pattern.compile("#([\\p{IsAlphabetic}\\p{IsIdeographic}0-9_]+)");
+  private static final int DEFAULT_FEED_LIMIT = 20;
+  private static final int MAX_FEED_LIMIT = 50;
 
   private final JdbcClient jdbcClient;
 
@@ -26,7 +33,13 @@ public class CommunityQueryService {
   }
 
   public List<PostDto> feed(Long currentUserId) {
-    return jdbcClient.sql("""
+    return feed(currentUserId, null, null);
+  }
+
+  public List<PostDto> feed(Long currentUserId, Integer requestedLimit, Long beforeId) {
+    int limit = normalizeLimit(requestedLimit);
+    Long normalizedBeforeId = normalizeBeforeId(beforeId);
+    List<PostRow> rows = jdbcClient.sql("""
       SELECT p.id,
              p.user_id,
              u.nickname AS user_nickname,
@@ -44,23 +57,24 @@ public class CommunityQueryService {
       WHERE p.deleted = 0
         AND p.status = 'ACTIVE'
         AND p.visibility = 'PUBLIC'
+        AND (:beforeId IS NULL OR p.id < :beforeId)
       ORDER BY p.created_at DESC, p.id DESC
+      LIMIT :limit
       """)
-      .query((rs, rowNum) -> mapPost(
-        rs.getLong("id"),
-        rs.getLong("user_id"),
-        rs.getString("user_nickname"),
-        rs.getString("user_avatar_url"),
-        rs.getObject("pet_id") == null ? null : rs.getLong("pet_id"),
-        rs.getString("pet_name"),
-        rs.getString("content"),
-        rs.getLong("like_count"),
-        rs.getLong("comment_count"),
-        PostVisibility.valueOf(rs.getString("visibility")),
-        timestampToString(rs.getTimestamp("created_at")),
-        currentUserId
-      ))
+      .param("beforeId", normalizedBeforeId)
+      .param("limit", limit)
+      .query((rs, rowNum) -> mapPostRow(rs))
       .list();
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+
+    List<Long> postIds = rows.stream().map(PostRow::id).toList();
+    Map<Long, List<String>> imagesByPostId = loadImages(postIds);
+    Set<Long> likedPostIds = loadLikedPostIds(postIds, currentUserId);
+    return rows.stream()
+      .map(row -> mapPost(row, imagesByPostId.getOrDefault(row.id(), List.of()), likedPostIds.contains(row.id())))
+      .toList();
   }
 
   public PostDto detail(Long postId, Long currentUserId) {
@@ -84,21 +98,9 @@ public class CommunityQueryService {
         AND p.status = 'ACTIVE'
       """)
       .param("postId", postId)
-      .query((rs, rowNum) -> mapPost(
-        rs.getLong("id"),
-        rs.getLong("user_id"),
-        rs.getString("user_nickname"),
-        rs.getString("user_avatar_url"),
-        rs.getObject("pet_id") == null ? null : rs.getLong("pet_id"),
-        rs.getString("pet_name"),
-        rs.getString("content"),
-        rs.getLong("like_count"),
-        rs.getLong("comment_count"),
-        PostVisibility.valueOf(rs.getString("visibility")),
-        timestampToString(rs.getTimestamp("created_at")),
-        currentUserId
-      ))
+      .query((rs, rowNum) -> mapPostRow(rs))
       .optional()
+      .map(row -> mapPost(row, loadImages(row.id()), isLikedByCurrentUser(row.id(), currentUserId)))
       .orElseThrow(() -> new AppException(404, "POST_NOT_FOUND", "Post not found"));
   }
 
@@ -129,23 +131,23 @@ public class CommunityQueryService {
       .list();
   }
 
-  private PostDto mapPost(Long id, Long userId, String userNickname, String userAvatarUrl, Long petId, String petName, String content, long likeCount, long commentCount, PostVisibility visibility, String createdAt, Long currentUserId) {
-    List<String> topics = extractTopics(content);
+  private PostDto mapPost(PostRow row, List<String> imageUrls, boolean liked) {
+    List<String> topics = extractTopics(row.content());
     return new PostDto(
-      id,
-      userId,
-      userNickname,
-      userAvatarUrl,
-      petId,
-      petName,
-      content,
-      loadImages(id),
+      row.id(),
+      row.userId(),
+      row.userNickname(),
+      row.userAvatarUrl(),
+      row.petId(),
+      row.petName(),
+      row.content(),
+      imageUrls,
       topics,
-      visibility,
-      likeCount,
-      commentCount,
-      isLikedByCurrentUser(id, currentUserId),
-      createdAt
+      row.visibility(),
+      row.likeCount(),
+      row.commentCount(),
+      liked,
+      row.createdAt()
     );
   }
 
@@ -159,6 +161,23 @@ public class CommunityQueryService {
       .param("postId", postId)
       .query(String.class)
       .list();
+  }
+
+  private Map<Long, List<String>> loadImages(List<Long> postIds) {
+    List<PostImageRow> imageRows = jdbcClient.sql("""
+      SELECT post_id, image_url
+      FROM post_image
+      WHERE post_id IN (:postIds)
+      ORDER BY post_id ASC, sort_order ASC, id ASC
+      """)
+      .param("postIds", postIds)
+      .query((rs, rowNum) -> new PostImageRow(rs.getLong("post_id"), rs.getString("image_url")))
+      .list();
+    Map<Long, List<String>> imagesByPostId = new LinkedHashMap<>();
+    for (PostImageRow imageRow : imageRows) {
+      imagesByPostId.computeIfAbsent(imageRow.postId(), id -> new ArrayList<>()).add(imageRow.imageUrl());
+    }
+    return imagesByPostId;
   }
 
   private boolean isLikedByCurrentUser(Long postId, Long currentUserId) {
@@ -175,6 +194,21 @@ public class CommunityQueryService {
       .query(Long.class)
       .single();
     return count != null && count > 0;
+  }
+
+  private Set<Long> loadLikedPostIds(List<Long> postIds, Long currentUserId) {
+    if (currentUserId == null) {
+      return Set.of();
+    }
+    return new LinkedHashSet<>(jdbcClient.sql("""
+      SELECT post_id
+      FROM post_like
+      WHERE user_id = :userId AND post_id IN (:postIds)
+      """)
+      .param("userId", currentUserId)
+      .param("postIds", postIds)
+      .query(Long.class)
+      .list());
   }
 
   private List<String> extractTopics(String content) {
@@ -205,5 +239,38 @@ public class CommunityQueryService {
 
   private String timestampToString(Timestamp timestamp) {
     return timestamp == null ? null : timestamp.toLocalDateTime().format(DATETIME_FORMATTER);
+  }
+
+  private PostRow mapPostRow(ResultSet rs) throws SQLException {
+    return new PostRow(
+      rs.getLong("id"),
+      rs.getLong("user_id"),
+      rs.getString("user_nickname"),
+      rs.getString("user_avatar_url"),
+      rs.getObject("pet_id") == null ? null : rs.getLong("pet_id"),
+      rs.getString("pet_name"),
+      rs.getString("content"),
+      rs.getLong("like_count"),
+      rs.getLong("comment_count"),
+      PostVisibility.valueOf(rs.getString("visibility")),
+      timestampToString(rs.getTimestamp("created_at"))
+    );
+  }
+
+  private int normalizeLimit(Integer requestedLimit) {
+    if (requestedLimit == null) {
+      return DEFAULT_FEED_LIMIT;
+    }
+    return Math.min(Math.max(requestedLimit, 1), MAX_FEED_LIMIT);
+  }
+
+  private Long normalizeBeforeId(Long beforeId) {
+    return beforeId == null || beforeId <= 0 ? null : beforeId;
+  }
+
+  private record PostRow(Long id, Long userId, String userNickname, String userAvatarUrl, Long petId, String petName, String content, long likeCount, long commentCount, PostVisibility visibility, String createdAt) {
+  }
+
+  private record PostImageRow(Long postId, String imageUrl) {
   }
 }

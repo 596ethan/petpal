@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,8 +35,8 @@ public class PostController {
   }
 
   @GetMapping("/feed")
-  public ApiResponse<List<PostDto>> feed() {
-    return ApiResponse.ok(communityQueryService.feed(authContext.currentUserId().orElse(null)));
+  public ApiResponse<List<PostDto>> feed(@RequestParam(required = false) Integer limit, @RequestParam(required = false) Long beforeId) {
+    return ApiResponse.ok(communityQueryService.feed(authContext.currentUserId().orElse(null), limit, beforeId));
   }
 
   @GetMapping("/{postId}")

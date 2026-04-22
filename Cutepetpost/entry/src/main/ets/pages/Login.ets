@@ -32,8 +32,7 @@ struct Login {
     this.loading = true;
     this.errorMessage = '';
     try {
-      const session = await PetPalRepository.login(phone, password);
-      PetPalRepository.storeSession(session);
+      await PetPalRepository.login(phone, password);
       await this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : String(error);

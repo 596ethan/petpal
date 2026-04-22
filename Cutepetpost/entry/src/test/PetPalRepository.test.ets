@@ -663,14 +663,11 @@ export default function petPalRepositoryTest() {
       expect(PetPalRepository.getComments(9999).length).assertEqual(0);
     });
 
-    it("core synchronous getters return empty state instead of mock data", 0, () => {
+    it("remaining synchronous getters return empty state instead of mock data", 0, () => {
       expect(PetPalRepository.getCurrentUser().id).assertEqual(0);
-      expect(PetPalRepository.getPets().length).assertEqual(0);
       expect(PetPalRepository.getHealthRecords(3).length).assertEqual(0);
       expect(PetPalRepository.getVaccines(3).length).assertEqual(0);
-      expect(PetPalRepository.getProviders().length).assertEqual(0);
       expect(PetPalRepository.getServices(1).length).assertEqual(0);
-      expect(PetPalRepository.getAppointments().length).assertEqual(0);
     });
 
     it("community read failure leaves cache empty instead of falling back to mock data", 0, async () => {

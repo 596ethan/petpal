@@ -4,6 +4,8 @@ import com.petpal.server.appointment.dto.AppointmentCreateRequest;
 import com.petpal.server.appointment.dto.AppointmentDto;
 import com.petpal.server.common.enums.AppointmentStatus;
 import com.petpal.server.common.error.AppException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -54,39 +56,13 @@ public class AppointmentService {
   public List<AppointmentDto> listByUser(long userId) {
     return jdbcClient.sql(baseAppointmentSelect() + " WHERE a.user_id = :userId ORDER BY a.id DESC")
       .param("userId", userId)
-      .query((rs, rowNum) -> new AppointmentDto(
-        rs.getLong("id"),
-        rs.getString("order_no"),
-        rs.getLong("user_id"),
-        rs.getLong("pet_id"),
-        rs.getString("pet_name"),
-        rs.getLong("provider_id"),
-        rs.getString("provider_name"),
-        rs.getLong("service_id"),
-        rs.getString("service_name"),
-        AppointmentStatus.valueOf(rs.getString("status")),
-        rs.getTimestamp("appointment_time").toLocalDateTime().format(RESPONSE_TIME),
-        rs.getString("remark")
-      ))
+      .query((rs, rowNum) -> mapAppointment(rs))
       .list();
   }
 
   public List<AppointmentDto> listAll() {
     return jdbcClient.sql(baseAppointmentSelect() + " ORDER BY a.id DESC")
-      .query((rs, rowNum) -> new AppointmentDto(
-        rs.getLong("id"),
-        rs.getString("order_no"),
-        rs.getLong("user_id"),
-        rs.getLong("pet_id"),
-        rs.getString("pet_name"),
-        rs.getLong("provider_id"),
-        rs.getString("provider_name"),
-        rs.getLong("service_id"),
-        rs.getString("service_name"),
-        AppointmentStatus.valueOf(rs.getString("status")),
-        rs.getTimestamp("appointment_time").toLocalDateTime().format(RESPONSE_TIME),
-        rs.getString("remark")
-      ))
+      .query((rs, rowNum) -> mapAppointment(rs))
       .list();
   }
 
@@ -123,10 +99,28 @@ public class AppointmentService {
   }
 
   private AppointmentDto getAppointmentById(Long appointmentId) {
-    return listAll().stream()
-      .filter(item -> item.id().equals(appointmentId))
-      .findFirst()
+    return jdbcClient.sql(baseAppointmentSelect() + " WHERE a.id = :id")
+      .param("id", appointmentId)
+      .query((rs, rowNum) -> mapAppointment(rs))
+      .optional()
       .orElseThrow(() -> new AppException(404, "APPOINTMENT_NOT_FOUND", "Appointment not found"));
+  }
+
+  private AppointmentDto mapAppointment(ResultSet rs) throws SQLException {
+    return new AppointmentDto(
+      rs.getLong("id"),
+      rs.getString("order_no"),
+      rs.getLong("user_id"),
+      rs.getLong("pet_id"),
+      rs.getString("pet_name"),
+      rs.getLong("provider_id"),
+      rs.getString("provider_name"),
+      rs.getLong("service_id"),
+      rs.getString("service_name"),
+      AppointmentStatus.valueOf(rs.getString("status")),
+      rs.getTimestamp("appointment_time").toLocalDateTime().format(RESPONSE_TIME),
+      rs.getString("remark")
+    );
   }
 
   private void ensurePetOwnedByUser(long userId, Long petId) {

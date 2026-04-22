@@ -7,7 +7,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/petpal?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: 54321
+    password: ${PETPAL_DB_PASSWORD:54321}
   servlet:
     multipart:
       max-file-size: 5MB

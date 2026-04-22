@@ -775,8 +775,31 @@ class PetPalServerMvcTest {
         .header("Authorization", "Bearer " + accessToken))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.data[0].id").value((int) postId))
+      .andExpect(jsonPath("$.data[0].imageUrls[0]").value("http://localhost:9000/petpal/community-1.jpg"))
       .andExpect(jsonPath("$.data[0].liked").value(true))
       .andExpect(jsonPath("$.data[0].likeCount").value(1));
+  }
+
+  @Test
+  void communityFeedSupportsLimitAndBeforeId() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    long olderPostId = createCommunityPost(accessToken, "First paged feed post");
+    long newerPostId = createCommunityPost(accessToken, "Second paged feed post");
+
+    mockMvc.perform(get("/api/post/feed")
+        .param("limit", "1")
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.length()").value(1))
+      .andExpect(jsonPath("$.data[0].id").value((int) newerPostId));
+
+    mockMvc.perform(get("/api/post/feed")
+        .param("limit", "1")
+        .param("beforeId", String.valueOf(newerPostId))
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.length()").value(1))
+      .andExpect(jsonPath("$.data[0].id").value((int) olderPostId));
   }
 
   @Test
@@ -1034,6 +1057,20 @@ class PetPalServerMvcTest {
     int start = body.indexOf(marker) + marker.length();
     int end = body.indexOf('"', start);
     return body.substring(start, end);
+  }
+
+  private long createCommunityPost(String accessToken, String content) throws Exception {
+    MvcResult result = mockMvc.perform(post("/api/post")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "content": "%s"
+          }
+          """.formatted(content)))
+      .andExpect(status().isOk())
+      .andReturn();
+    return readDataId(result.getResponse().getContentAsString());
   }
 
   private long readDataId(String body) throws Exception {

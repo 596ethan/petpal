@@ -247,10 +247,6 @@ export class PetPalRepository {
     PetPalRepository.commentCache = {};
   }
 
-  static getPets(): Pet[] {
-    return [];
-  }
-
   static getPetById(id: number): Pet {
     void id;
     throw new Error('宠物档案需要从后端加载');
@@ -279,10 +275,6 @@ export class PetPalRepository {
     return PetPalRepository.commentCache[postId] ?? [];
   }
 
-  static getProviders(): ServiceProvider[] {
-    return [];
-  }
-
   static getProviderById(id: number): ServiceProvider {
     void id;
     throw new Error('服务机构需要从后端加载');
@@ -290,10 +282,6 @@ export class PetPalRepository {
 
   static getServices(providerId: number): ServiceItem[] {
     void providerId;
-    return [];
-  }
-
-  static getAppointments(): Appointment[] {
     return [];
   }
 
