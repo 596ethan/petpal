@@ -196,10 +196,12 @@ export interface AppointmentCreateInput {
 export class PetPalRepository {
   private static apiBaseUrl: string = PETPAL_API_BASE_URL;
   private static session: LoginSession | null = null;
+  // 社区列表和评论保留一份轻量缓存，供列表页返回后详情页即时读取；真实数据仍以接口刷新结果为准。
   private static postCache: Post[] = [];
   private static commentCache: Record<number, CommentItem[]> = {};
   private static testRequestHandler: PetPalRepositoryRequestHandler | null = null;
 
+  // 应用启动时必须先初始化会话存储，再配置 HTTP 客户端，否则后续鉴权请求拿不到本地 token。
   static initialize(context: common.UIAbilityContext): void {
     PetPalSessionStore.initialize(context);
     PetPalRepository.hydrateSessionFromStore();
@@ -475,6 +477,7 @@ export class PetPalRepository {
   }
 
   static async uploadPostImage(input: FileUploadInput): Promise<FileUploadResult> {
+    // HarmonyOS 当前路径下直接拼 multipart 字符串，保证后端按普通文件上传接口接收。
     const boundary = `----PetPalBoundary${Date.now()}`;
     const body = PetPalRepository.buildMultipartBody(input, boundary);
     const payload = await PetPalRepository.request<BackendFileUpload>(
@@ -523,6 +526,7 @@ export class PetPalRepository {
     authRequired: boolean = true,
     extraHeaders?: Record<string, string>
   ): Promise<T> {
+    // 这里统一组装业务请求头。rawRequest 传 auth:false，是为了避免底层客户端重复注入 Authorization。
     let headers: Record<string, string> = {
       'Accept': 'application/json',
       'Content-Type': 'application/json'
@@ -567,6 +571,7 @@ export class PetPalRepository {
     }
 
     if (responseCode === 401 || responseCode === 403) {
+      // 受保护接口认证失败时清掉本地会话，让页面走重新登录，而不是继续使用失效 token。
       if (authRequired) {
         await PetPalRepository.clearPersistedSession();
         throw new Error(envelope?.message ?? '登录已失效，请重新登录');
@@ -599,6 +604,7 @@ export class PetPalRepository {
   }
 
   private static communityReadAuthRequired(): boolean {
+    // 社区读接口允许未登录浏览；已登录时带 token，后端才能返回 liked 等个性化字段。
     PetPalRepository.hydrateSessionFromStore();
     return PetPalRepository.session !== null;
   }

@@ -38,6 +38,7 @@ public class JwtService {
   public Long parseAccessUserId(String token) {
     Claims claims = parseClaims(token);
     String tokenType = claims.get("type", String.class);
+    // 只允许 access token 进入接口鉴权，避免 refresh token 被误用为业务访问凭证。
     if (!"access".equals(tokenType)) {
       throw new IllegalArgumentException("Token type must be access");
     }
@@ -54,6 +55,7 @@ public class JwtService {
 
   private String createToken(Long userId, String phone, long expireSeconds, String type) {
     Instant now = Instant.now();
+    // subject 固定存用户 ID，过滤器解析后直接放入 Spring Security 上下文。
     return Jwts.builder()
       .subject(String.valueOf(userId))
       .issuer(issuer)

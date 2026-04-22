@@ -23,6 +23,7 @@ public class AuthService {
   }
 
   public Map<String, Object> register(RegisterRequest request) {
+    // 手机端 MVP 用手机号作为唯一登录标识；注册时先拦截重复号码，避免生成孤立 profile。
     userAccountRepository.findByPhone(request.phone()).ifPresent(existing -> {
       throw new AppException(409, "PHONE_EXISTS", "Phone already registered");
     });
@@ -32,6 +33,7 @@ public class AuthService {
   }
 
   public Map<String, Object> login(LoginRequest request) {
+    // 账号不存在和密码错误统一返回同一错误，避免向客户端暴露手机号是否已注册。
     UserAccountRecord account = userAccountRepository.findByPhone(request.phone())
       .orElseThrow(() -> new AppException(401, "INVALID_CREDENTIALS", "Invalid phone or password"));
     if (!passwordMatches(request.password(), account.password())) {
@@ -46,6 +48,7 @@ public class AuthService {
   }
 
   private AuthTokens createTokens(Long userId, String phone) {
+    // access token 用于接口鉴权，refresh token 预留给后续刷新登录态。
     return new AuthTokens(jwtService.createAccessToken(userId, phone), jwtService.createRefreshToken(userId, phone));
   }
 

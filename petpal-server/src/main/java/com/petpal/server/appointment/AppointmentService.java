@@ -26,6 +26,7 @@ public class AppointmentService {
   }
 
   public AppointmentDto create(long userId, AppointmentCreateRequest request) {
+    // 创建预约前先确认宠物归属和服务归属，避免用户绕过前端提交越权组合。
     ensurePetOwnedByUser(userId, request.petId());
     ensureServiceMatchesProvider(request.providerId(), request.serviceId());
     String orderNo = "PP" + System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(100, 1000);
@@ -75,6 +76,7 @@ public class AppointmentService {
       throw new AppException(409, "APPOINTMENT_NOT_CANCELLABLE", "Appointment cannot be cancelled");
     }
     if (record.status() == AppointmentStatus.CONFIRMED) {
+      // 已确认预约临近服务时间时不允许用户取消，规则与 phone-mvp Slice 3 保持一致。
       Duration leadTime = Duration.between(LocalDateTime.now(), record.appointmentTime());
       if (leadTime.toMinutes() < 120) {
         throw new AppException(409, "APPOINTMENT_NOT_CANCELLABLE", "Confirmed appointments within 2 hours cannot be cancelled");
@@ -88,6 +90,7 @@ public class AppointmentService {
 
   public AppointmentDto updateStatus(Long appointmentId, AppointmentStatus nextStatus) {
     AppointmentRecord record = loadAppointmentRecord(appointmentId);
+    // 管理端只能按有限状态机推进预约，禁止从终态回退或跳转。
     if (!isLegalTransition(record.status(), nextStatus)) {
       throw new AppException(409, "INVALID_APPOINTMENT_STATUS", "Illegal appointment status transition");
     }
@@ -147,6 +150,7 @@ public class AppointmentService {
 
   private LocalDateTime parseAppointmentTime(String appointmentTime) {
     try {
+      // 手机端约定提交 ISO 8601 本地时间，例如 2026-04-12T15:30:00。
       return LocalDateTime.parse(appointmentTime);
     } catch (DateTimeParseException ex) {
       throw new AppException(400, "INVALID_APPOINTMENT_TIME", "Appointment time must use ISO 8601 format");
@@ -167,6 +171,7 @@ public class AppointmentService {
   }
 
   private boolean isLegalTransition(AppointmentStatus currentStatus, AppointmentStatus nextStatus) {
+    // PENDING_CONFIRM -> CONFIRMED/CANCELLED -> COMPLETED/CANCELLED；其他状态都是终态。
     return switch (currentStatus) {
       case PENDING_CONFIRM -> nextStatus == AppointmentStatus.CONFIRMED || nextStatus == AppointmentStatus.CANCELLED;
       case CONFIRMED -> nextStatus == AppointmentStatus.COMPLETED || nextStatus == AppointmentStatus.CANCELLED;

@@ -36,6 +36,7 @@ public class PetCommandService {
   }
 
   public PetDto create(long userId, PetCreateRequest request) {
+    // 新建宠物时集中做字段清洗和默认头像补齐，保证数据库里保存的是可直接展示的数据。
     String name = requiredText(request.name(), 50, "INVALID_PET_FIELD", "Pet name is required");
     String breed = optionalText(request.breed(), 50, "INVALID_PET_FIELD", "Pet breed is too long");
     String avatarUrl = defaultAvatarUrl(
@@ -67,6 +68,7 @@ public class PetCommandService {
 
   public PetDto update(long userId, Long petId, PetUpdateRequest request) {
     PetDto existing = petQueryService.getPet(userId, petId);
+    // 更新接口支持局部提交：请求里没带的字段必须沿用旧值，不能被覆盖为空。
     String name = request.hasName()
       ? requiredText(request.name(), 50, "INVALID_PET_FIELD", "Pet name is required")
       : existing.name();
@@ -112,6 +114,7 @@ public class PetCommandService {
 
   public void delete(long userId, Long petId) {
     petQueryService.getPet(userId, petId);
+    // 这里是软删除，保留历史健康记录、疫苗记录和预约记录，列表/详情再按 deleted 过滤。
     jdbcClient.sql("""
       UPDATE pet
       SET deleted = 1,
@@ -205,6 +208,7 @@ public class PetCommandService {
     if (avatarUrl != null) {
       return avatarUrl;
     }
+    // 前端未上传头像时按物种给默认图，避免宠物卡片出现空图。
     return switch (species) {
       case DOG -> DEFAULT_DOG_AVATAR_URL;
       case CAT -> DEFAULT_CAT_AVATAR_URL;
@@ -261,6 +265,7 @@ public class PetCommandService {
       throw new AppException(400, code, message);
     }
     try {
+      // 宠物档案日期统一使用 yyyy-MM-dd，和 phone-mvp Slice 4 的接口约定一致。
       return Date.valueOf(LocalDate.parse(trimmed));
     } catch (DateTimeParseException ex) {
       throw new AppException(400, code, message);

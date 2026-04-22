@@ -16,12 +16,14 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 public class GlobalExceptionHandler {
   @ExceptionHandler(AppException.class)
   public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
+    // 业务层主动抛出的错误保留原 status/code/message，方便手机端直接展示可读错误。
     return ResponseEntity.status(ex.status())
       .body(new ApiResponse<>(ex.code(), ex.getMessage(), null, null));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
+    // Bean Validation 可能返回多个字段错误，接口只取第一个，避免前端一次展示过多信息。
     String message = ex.getBindingResult().getFieldErrors().stream()
       .findFirst()
       .map(error -> error.getField() + " " + error.getDefaultMessage())
@@ -56,6 +58,7 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex, HttpServletRequest request) {
+    // 未预期异常统一转成 500，不把堆栈细节暴露给客户端。
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
       .body(new ApiResponse<>("INTERNAL_ERROR", "Unexpected error at " + request.getRequestURI(), null, null));
   }

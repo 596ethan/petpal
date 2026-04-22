@@ -63,6 +63,7 @@ export class PetPalHttpClient {
   }
 
   async request<T>(method: PetPalHttpMethod, path: string, options: PetPalHttpRequestOptions = {}): Promise<PetPalHttpResponse<T>> {
+    // 每次请求都创建并销毁 http 对象，避免页面多次进入后残留连接或回调。
     const request = http.createHttp();
     const url = this.buildUrl(path, options.query);
     const requestHeaders = this.buildHeaders(options.auth !== false, options.headers);
@@ -123,6 +124,7 @@ export class PetPalHttpClient {
 
     const pairs: string[] = [];
     const keys = Object.keys(query);
+    // 避免使用 for..in，保持 ArkTS 编译规则下的对象遍历写法。
     for (let index = 0; index < keys.length; index++) {
       const key = keys[index];
       const value = query[key];
@@ -141,6 +143,7 @@ export class PetPalHttpClient {
     merged['Content-Type'] = 'application/json';
 
     if (includeAuth) {
+      // 鉴权头只从 SessionStore 读取，避免页面层直接接触 token 细节。
       const authHeaders = PetPalSessionStore.getAuthHeaders();
       const authKeys = Object.keys(authHeaders);
       for (let index = 0; index < authKeys.length; index++) {
@@ -172,6 +175,7 @@ export class PetPalHttpClient {
       return result;
     }
     if (result instanceof ArrayBuffer) {
+      // HarmonyOS 网络层有时返回 ArrayBuffer，统一转成 UTF-8 字符串后再解析。
       return this.decoder.decodeToString(new Uint8Array(result));
     }
     return JSON.stringify(result);

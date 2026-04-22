@@ -69,10 +69,12 @@ interface PetPalBackendLoginPayload {
 export class PetPalApiClient {
   private static client: PetPalHttpClient | null = null;
 
+  // 由 Repository 在启动或切换后端地址时调用，所有业务接口共用同一个底层 HTTP 客户端。
   static configure(config: PetPalApiClientConfig): void {
     PetPalApiClient.client = new PetPalHttpClient(config.baseUrl, config.timeoutMs ?? 15000);
   }
 
+  // 登录成功后同时写入本地会话，后续请求才能自动带上 Authorization。
   static async login(requestBody: PetPalLoginRequest): Promise<PetPalLoginResult> {
     const options: PetPalApiRequestOptions = {
       auth: false,
@@ -185,6 +187,7 @@ export class PetPalApiClient {
         rawBody: response.rawBody
       };
     } catch (error) {
+      // 非 2xx 的业务响应仍返回原始响应体，让上层能读取后端 envelope 中的错误 message/code。
       if (error instanceof PetPalHttpError && error.statusCode > 0) {
         return {
           statusCode: error.statusCode,
@@ -201,6 +204,7 @@ export class PetPalApiClient {
     path: string,
     options: PetPalApiRequestOptions = {}
   ): Promise<T> {
+    // 后端统一返回 ApiResponse 包装；这里集中拆 envelope，页面层只处理真实 data 或错误。
     const response = await PetPalApiClient.rawRequest(method, path, options);
     const envelope = PetPalApiClient.parseEnvelope<T>(response.rawBody);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -238,6 +242,7 @@ export class PetPalApiClient {
   }
 
   private static mapUserProfile(profile: PetPalBackendUserProfilePayload): UserProfile {
+    // 后端字段允许为空时在客户端兜成空值，避免 ArkUI 绑定 undefined 后出现显示异常。
     return {
       id: profile.id,
       nickname: profile.nickname,

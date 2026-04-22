@@ -30,6 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     if (header != null && header.startsWith("Bearer ")) {
       String token = header.substring(7);
       try {
+        // 管理端等前置过滤器可能已写入认证信息；这里不覆盖已有上下文。
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
           filterChain.doFilter(request, response);
           return;
@@ -39,6 +40,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           UsernamePasswordAuthenticationToken.authenticated(String.valueOf(userId), token, List.of());
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (Exception ignored) {
+        // token 无效时直接返回统一 401，防止后续接口以匿名身份继续执行。
         SecurityContextHolder.clearContext();
         writeUnauthorized(response);
         return;

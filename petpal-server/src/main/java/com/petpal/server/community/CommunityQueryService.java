@@ -39,6 +39,7 @@ public class CommunityQueryService {
   public List<PostDto> feed(Long currentUserId, Integer requestedLimit, Long beforeId) {
     int limit = normalizeLimit(requestedLimit);
     Long normalizedBeforeId = normalizeBeforeId(beforeId);
+    // 动态流只返回公开、未删除、启用的帖子；beforeId 用于手机端下拉分页。
     List<PostRow> rows = jdbcClient.sql("""
       SELECT p.id,
              p.user_id,
@@ -70,6 +71,7 @@ public class CommunityQueryService {
     }
 
     List<Long> postIds = rows.stream().map(PostRow::id).toList();
+    // 图片和点赞状态批量查，避免列表每条帖子额外访问数据库。
     Map<Long, List<String>> imagesByPostId = loadImages(postIds);
     Set<Long> likedPostIds = loadLikedPostIds(postIds, currentUserId);
     return rows.stream()
@@ -212,6 +214,7 @@ public class CommunityQueryService {
   }
 
   private List<String> extractTopics(String content) {
+    // 话题暂时从正文里的 #xxx 提取，保持社区 P0 不额外增加标签表。
     Matcher matcher = TOPIC_PATTERN.matcher(content == null ? "" : content);
     LinkedHashSet<String> topics = new LinkedHashSet<>();
     while (matcher.find()) {
@@ -258,6 +261,7 @@ public class CommunityQueryService {
   }
 
   private int normalizeLimit(Integer requestedLimit) {
+    // 限制单页数量，防止客户端传入过大的 limit 拉垮列表接口。
     if (requestedLimit == null) {
       return DEFAULT_FEED_LIMIT;
     }

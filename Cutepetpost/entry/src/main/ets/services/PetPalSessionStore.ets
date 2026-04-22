@@ -18,6 +18,7 @@ export class PetPalSessionStore {
   private static snapshot: PetPalSessionSnapshot | null = null;
 
   static initialize(context: common.UIAbilityContext): void {
+    // preferences 是手机端会话的持久化来源；初始化失败时只退回内存态，不阻断应用启动。
     PetPalSessionStore.context = context;
     try {
       const options: preferences.Options = { name: SESSION_STORAGE_NAME };
@@ -62,6 +63,7 @@ export class PetPalSessionStore {
   }
 
   static async setSession(snapshot: PetPalSessionSnapshot): Promise<void> {
+    // 先更新内存快照，页面立即可读；再异步落盘，保证重启后还能恢复登录态。
     PetPalSessionStore.snapshot = PetPalSessionStore.normalizeSnapshot(snapshot);
     await PetPalSessionStore.persistSnapshot();
   }
@@ -136,6 +138,7 @@ export class PetPalSessionStore {
       return;
     }
     if (!PetPalSessionStore.snapshot || !PetPalSessionStore.snapshot.accessToken) {
+      // 空 token 视为退出登录，清掉持久化数据，避免下次启动误判已登录。
       try {
         await PetPalSessionStore.pref.delete(SESSION_STORAGE_KEY);
         await PetPalSessionStore.pref.flush();

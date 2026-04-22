@@ -50,6 +50,7 @@ public class PetQueryService {
 
   public List<HealthRecordDto> listHealthRecords(long userId, Long petId) {
     ensurePetOwnedByUser(userId, petId);
+    // 健康记录按业务要求倒序返回，手机端时间线可以直接按接口结果展示。
     return jdbcClient.sql("""
       SELECT id, record_type, title, description, record_date, next_date
       FROM pet_health_record
@@ -70,6 +71,7 @@ public class PetQueryService {
 
   public List<VaccineRecordDto> listVaccines(long userId, Long petId) {
     ensurePetOwnedByUser(userId, petId);
+    // 疫苗记录同样由后端保证排序，避免不同页面重复实现排序规则。
     return jdbcClient.sql("""
       SELECT id, vaccine_name, vaccinated_at, next_due_at, hospital
       FROM pet_vaccine
@@ -117,6 +119,7 @@ public class PetQueryService {
   }
 
   private void ensurePetOwnedByUser(long userId, Long petId) {
+    // 所有宠物子资源先校验归属和软删除状态，避免越权读取健康/疫苗记录。
     Long count = jdbcClient.sql("SELECT COUNT(*) FROM pet WHERE id = :petId AND owner_id = :userId AND deleted = 0")
       .param("petId", petId)
       .param("userId", userId)

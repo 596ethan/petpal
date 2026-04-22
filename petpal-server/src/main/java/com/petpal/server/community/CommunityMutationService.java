@@ -34,6 +34,7 @@ public class CommunityMutationService {
 
   @Transactional
   public PostDto createPost(long userId, PostCreateRequest request) {
+    // 发帖、图片入库需要保持一致，所以放在同一个事务里提交。
     String content = requiredText(request.content(), MAX_POST_CONTENT_LENGTH, "INVALID_POST_FIELD", "Post content is required");
     List<String> imageUrls = normalizeImageUrls(request.imageUrls());
     if (request.petId() != null) {
@@ -59,6 +60,7 @@ public class CommunityMutationService {
   @Transactional
   public void deletePost(long userId, Long postId) {
     ensurePostOwnedByUser(userId, postId);
+    // 社区删除采用软删除，避免历史计数和后续审计数据被物理移除。
     jdbcClient.sql("""
       UPDATE post
       SET deleted = 1,
@@ -76,6 +78,7 @@ public class CommunityMutationService {
   @Transactional
   public void like(long userId, Long postId) {
     ensurePostExists(postId);
+    // 点赞接口做成幂等：重复点赞直接返回，计数不会重复增加。
     Long existing = jdbcClient.sql("""
       SELECT COUNT(*)
       FROM post_like
@@ -117,6 +120,7 @@ public class CommunityMutationService {
       .param("userId", userId)
       .update();
     if (deleted > 0) {
+      // 只有真实删除了点赞记录才扣计数，防止重复取消导致计数变成负数。
       jdbcClient.sql("""
         UPDATE post
         SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END,
@@ -254,6 +258,7 @@ public class CommunityMutationService {
     if (values == null) {
       return List.of();
     }
+    // 后端限制图片数量和 URL 长度，前端校验失效时仍能保护数据库字段。
     if (values.size() > MAX_IMAGE_COUNT) {
       throw new AppException(400, "INVALID_POST_IMAGE", "Post supports up to 9 images");
     }
