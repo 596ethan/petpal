@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/file")
@@ -58,12 +57,9 @@ public class FileController {
   }
 
   private String buildPublicUrl(HttpServletRequest request, String fileKey) {
-    return ServletUriComponentsBuilder.fromRequest(request)
-      .replacePath(request.getContextPath() + "/api/file/object/")
-      .path(fileKey)
-      .replaceQuery(null)
-      .build()
-      .toUriString();
+    String contextPath = request.getContextPath() == null ? "" : request.getContextPath().trim();
+    String prefix = contextPath.isEmpty() ? "/api/file/object/" : contextPath + "/api/file/object/";
+    return prefix + fileKey;
   }
 
   private String extractFileKey(HttpServletRequest request) {

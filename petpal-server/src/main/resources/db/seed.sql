@@ -1,14 +1,14 @@
 INSERT INTO user (id, phone, password, nickname, avatar_url, bio) VALUES
-(1, '13800000001', '$2a$10$Trga2O1gLdnL6g8mvggVK.kdQdkQkkcEQ8AWzaS1oTD.t4eZLKfzi', '小满', 'https://placehold.co/96x96', '猫狗照护日记'),
-(2, '13800000002', '$2a$10$Trga2O1gLdnL6g8mvggVK.kdQdkQkkcEQ8AWzaS1oTD.t4eZLKfzi', '阿宁', 'https://placehold.co/96x96', '每周洗护记录');
+(1, '13800000001', '$2a$10$Trga2O1gLdnL6g8mvggVK.kdQdkQkkcEQ8AWzaS1oTD.t4eZLKfzi', '小满', 'https://loremflickr.com/96/96/person?lock=9301', '猫狗照护日记'),
+(2, '13800000002', '$2a$10$Trga2O1gLdnL6g8mvggVK.kdQdkQkkcEQ8AWzaS1oTD.t4eZLKfzi', '阿宁', 'https://loremflickr.com/96/96/person?lock=9302', '每周洗护记录');
 
 INSERT INTO user_follow (follower_id, following_id) VALUES
 (1, 2),
 (2, 1);
 
 INSERT INTO pet (id, owner_id, name, species, breed, gender, birthday, weight, avatar_url, is_neutered) VALUES
-(1, 1, '糯米', 'CAT', '英短', 'FEMALE', '2022-05-01', 4.30, 'https://placehold.co/120x120', 1),
-(2, 1, '七七', 'DOG', '柯基', 'MALE', '2021-11-18', 10.80, 'https://placehold.co/120x120', 0);
+(1, 1, '糯米', 'CAT', '英短', 'FEMALE', '2022-05-01', 4.30, 'https://loremflickr.com/320/320/cat?lock=9201', 1),
+(2, 1, '七七', 'DOG', '柯基', 'MALE', '2021-11-18', 10.80, 'https://loremflickr.com/320/320/dog?lock=9202', 0);
 
 INSERT INTO pet_health_record (pet_id, record_type, title, description, record_date, next_date) VALUES
 (1, 'CHECKUP', '年度体检', '血常规正常，食欲稳定。', '2026-02-18', '2027-02-18'),

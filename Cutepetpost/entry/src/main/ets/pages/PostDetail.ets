@@ -2,6 +2,7 @@
 import { PetPalRepository } from '../repository/PetPalRepository';
 import { UserProfile } from '../models/PetPalModels';
 import { PetPalTheme } from '../ui/PetPalTheme';
+import { SoftAvatar } from './index-tabs/IndexTabShared';
 
 @Builder
 function PostChip(label: string, backgroundColor: string, fontColor: string) {
@@ -20,6 +21,29 @@ const EMPTY_USER: UserProfile = {
   avatarUrl: '',
   followingCount: 0,
   followerCount: 0
+}
+
+@Component
+struct PostAuthorAvatar {
+  @Prop imageUrl: string = ''
+  @Prop label: string = '友'
+  @Prop avatarSize: number = 52
+  @State imageFailed: boolean = false
+
+  build() {
+    if (this.imageUrl.length > 0 && !this.imageFailed) {
+      Image(this.imageUrl)
+        .width(this.avatarSize)
+        .height(this.avatarSize)
+        .objectFit(ImageFit.Cover)
+        .borderRadius(this.avatarSize / 2)
+        .onError(() => {
+          this.imageFailed = true
+        })
+    } else {
+      SoftAvatar(this.label, 'rgba(255, 248, 243, 0.14)', '#FFF8F3', this.avatarSize)
+    }
+  }
 }
 
 @Entry
@@ -193,11 +217,11 @@ struct PostDetail {
   StoryHero(post: Post) {
     Column({ space: 16 }) {
       Row({ space: 12 }) {
-        Image(post.authorAvatarUrl)
-          .width(52)
-          .height(52)
-          .objectFit(ImageFit.Cover)
-          .borderRadius(26)
+        PostAuthorAvatar({
+          imageUrl: post.authorAvatarUrl,
+          label: post.authorName.length > 0 ? post.authorName.substring(0, 1) : '友',
+          avatarSize: 52
+        })
         Column({ space: 5 }) {
           Text(post.authorName)
             .fontSize(27)

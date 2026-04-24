@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CommunityMutationService {
+  private static final String BACKEND_FILE_OBJECT_PREFIX = "/api/file/object/";
   private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private static final int MAX_POST_CONTENT_LENGTH = 500;
   private static final int MAX_COMMENT_CONTENT_LENGTH = 200;
@@ -271,9 +272,17 @@ public class CommunityMutationService {
       if (trimmed.length() > MAX_IMAGE_URL_LENGTH) {
         throw new AppException(400, "INVALID_POST_IMAGE", "Post image URL is too long");
       }
-      normalized.add(trimmed);
+      normalized.add(canonicalizeBackendProxyUrl(trimmed));
     }
     return normalized;
+  }
+
+  private String canonicalizeBackendProxyUrl(String value) {
+    int markerIndex = value.indexOf(BACKEND_FILE_OBJECT_PREFIX);
+    if (markerIndex >= 0) {
+      return value.substring(markerIndex);
+    }
+    return value;
   }
 
   private String timestampToString(Timestamp timestamp) {

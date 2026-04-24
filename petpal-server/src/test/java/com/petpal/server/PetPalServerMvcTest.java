@@ -743,8 +743,8 @@ class PetPalServerMvcTest {
             "petId": 1,
             "content": "Community P0 post with #care",
             "imageUrls": [
-              "http://localhost:9000/petpal/community-1.jpg",
-              "http://localhost:9000/petpal/community-2.jpg"
+              "http://192.168.1.3:18080/api/file/object/community/community-1.jpg",
+              "http://192.168.1.3:18080/api/file/object/community/community-2.jpg"
             ]
           }
           """))
@@ -767,7 +767,7 @@ class PetPalServerMvcTest {
     mockMvc.perform(get("/api/post/{postId}", postId)
         .header("Authorization", "Bearer " + accessToken))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.data.imageUrls[0]").value("http://localhost:9000/petpal/community-1.jpg"))
+      .andExpect(jsonPath("$.data.imageUrls[0]").value("/api/file/object/community/community-1.jpg"))
       .andExpect(jsonPath("$.data.likeCount").value(1))
       .andExpect(jsonPath("$.data.liked").value(true));
 
@@ -775,7 +775,7 @@ class PetPalServerMvcTest {
         .header("Authorization", "Bearer " + accessToken))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.data[0].id").value((int) postId))
-      .andExpect(jsonPath("$.data[0].imageUrls[0]").value("http://localhost:9000/petpal/community-1.jpg"))
+      .andExpect(jsonPath("$.data[0].imageUrls[0]").value("/api/file/object/community/community-1.jpg"))
       .andExpect(jsonPath("$.data[0].liked").value(true))
       .andExpect(jsonPath("$.data[0].likeCount").value(1));
   }
@@ -1007,7 +1007,7 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.code").value("OK"))
       .andExpect(jsonPath("$.data.fileKey").value("community/test-image.png"))
-      .andExpect(jsonPath("$.data.url").value("http://localhost/api/file/object/community/test-image.png"));
+      .andExpect(jsonPath("$.data.url").value("/api/file/object/community/test-image.png"));
   }
 
   @Test

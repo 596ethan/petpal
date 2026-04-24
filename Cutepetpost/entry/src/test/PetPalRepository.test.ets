@@ -13,12 +13,15 @@ import {
   UserProfile,
   VaccineRecordCreateInput
 } from '../main/ets/models/PetPalModels';
+import { PETPAL_API_BASE_URL } from '../main/ets/config/PetPalAppConfig';
 import {
   AppointmentCreateInput,
   PetPalRepository,
   PetPalRepositoryRequest,
   PetPalRepositoryResponse
 } from '../main/ets/repository/PetPalRepository';
+
+const DEFAULT_SERVER_ORIGIN: string = PETPAL_API_BASE_URL.substring(0, PETPAL_API_BASE_URL.lastIndexOf('/api'));
 
 interface TestEnvelope<T> {
   code: string;
@@ -228,7 +231,7 @@ function postPayload(id: number = 20, liked: boolean = false, likeCount: number 
     petId: 1,
     petName: 'Nuomi',
     content: 'Community P0 #care',
-    imageUrls: ['https://example.com/community-1.png'],
+    imageUrls: ['/api/file/object/community/test-image.png'],
     topics: ['care'],
     visibility: 'PUBLIC',
     likeCount: likeCount,
@@ -653,6 +656,7 @@ export default function petPalRepositoryTest() {
       expect(posts[0].id).assertEqual(21);
       expect(posts[0].userId).assertEqual(1);
       expect(posts[0].imageUrls.length).assertEqual(1);
+      expect(posts[0].imageUrls[0]).assertEqual(`${DEFAULT_SERVER_ORIGIN}/api/file/object/community/test-image.png`);
       expect(posts[0].liked).assertTrue();
       expect(posts[0].likeCount).assertEqual(3);
     });
@@ -702,6 +706,7 @@ export default function petPalRepositoryTest() {
           expect(body.content).assertEqual("Community P0 #care");
           expect(body.petId).assertEqual(1);
           expect(body.imageUrls?.length).assertEqual(1);
+          expect(body.imageUrls?.[0]).assertEqual("/api/file/object/community/test-image.png");
           return {
             responseCode: 200,
             result: okEnvelope<TestPostPayload>(postPayload(22, false, 0))
@@ -718,7 +723,7 @@ export default function petPalRepositoryTest() {
       const post = await PetPalRepository.createPost({
         content: "Community P0 #care",
         petId: 1,
-        imageUrls: ["https://example.com/community-1.png"]
+        imageUrls: ["http://192.168.1.3:18080/api/file/object/community/test-image.png"]
       });
       await PetPalRepository.deletePost(post.id);
 
@@ -807,7 +812,7 @@ export default function petPalRepositoryTest() {
           responseCode: 200,
           result: okEnvelope<TestFileUploadPayload>({
             fileKey: "community/test.png",
-            url: "http://localhost:9000/petpal/community/test.png"
+            url: "/api/file/object/community/test.png"
           })
         };
       });
@@ -817,7 +822,7 @@ export default function petPalRepositoryTest() {
       const result = await PetPalRepository.uploadPostImage(input);
 
       expect(result.fileKey).assertEqual("community/test.png");
-      expect(result.url).assertEqual("http://localhost:9000/petpal/community/test.png");
+      expect(result.url).assertEqual(`${DEFAULT_SERVER_ORIGIN}/api/file/object/community/test.png`);
     });
 
     it("community write surfaces backend errors", 0, async () => {

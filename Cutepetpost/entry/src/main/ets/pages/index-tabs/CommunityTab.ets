@@ -1,16 +1,18 @@
-﻿import { Post } from '../../models/PetPalModels';
+import { Pet, Post } from '../../models/PetPalModels';
 import { PetPalTheme } from '../../ui/PetPalTheme';
 import {
   CapsuleChip,
   EmptyStatePanel,
   LoginRequiredPanel,
   SectionLead,
+  SoftAvatar,
   StoryImageBlock
 } from './IndexTabShared';
 
 export interface CommunityTabProps {
   isAuthenticated: boolean
   refreshing: boolean
+  pets: Pet[]
   posts: Post[]
   communityMessage: string
   communityError: string
@@ -19,18 +21,41 @@ export interface CommunityTabProps {
   postUploading: boolean
   postActionId: number
   postContent: string
-  postPetIdText: string
+  selectedPostPetId: number
   postImageUrls: string[]
   userId: number
   onGoLogin: () => void
   onToggleComposer: () => void
   onPostContentChange: (value: string) => void
-  onPostPetIdTextChange: (value: string) => void
+  onSelectPostPet: (petId: number) => void
   onUploadImages: () => void
   onSubmitPost: () => void
   onToggleLike: (post: Post) => void
   onDeletePost: (post: Post) => void
   onOpenPostDetail: (postId: number) => void
+}
+
+@Component
+struct CommunityAuthorAvatar {
+  @Prop imageUrl: string = ''
+  @Prop label: string = '友'
+  @Prop avatarSize: number = 44
+  @State imageFailed: boolean = false
+
+  build() {
+    if (this.imageUrl.length > 0 && !this.imageFailed) {
+      Image(this.imageUrl)
+        .width(this.avatarSize)
+        .height(this.avatarSize)
+        .objectFit(ImageFit.Cover)
+        .borderRadius(this.avatarSize / 2)
+        .onError(() => {
+          this.imageFailed = true
+        })
+    } else {
+      SoftAvatar(this.label, PetPalTheme.primarySoft, PetPalTheme.primary, this.avatarSize)
+    }
+  }
 }
 
 @Builder
@@ -48,14 +73,38 @@ function PostComposer($$: CommunityTabProps) {
       .onChange((value: string) => {
         $$.onPostContentChange(value)
       })
-    TextInput({ text: $$.postPetIdText, placeholder: '宠物编号（可选）' })
-      .height(48)
-      .backgroundColor(PetPalTheme.surface)
-      .borderRadius(PetPalTheme.radiusImage)
-      .padding({ left: 12, right: 12 })
-      .onChange((value: string) => {
-        $$.onPostPetIdTextChange(value)
+    Text('关联宠物')
+      .fontSize(12)
+      .fontColor(PetPalTheme.textSubtle)
+    Row({ space: 8 }) {
+      Button($$.selectedPostPetId === 0 ? '不关联宠物 已选' : '不关联宠物')
+        .height(36)
+        .fontSize(12)
+        .fontColor($$.selectedPostPetId === 0 ? '#FFFFFF' : PetPalTheme.text)
+        .backgroundColor($$.selectedPostPetId === 0 ? PetPalTheme.primary : PetPalTheme.surfaceWarm)
+        .borderRadius(PetPalTheme.radiusChip)
+        .onClick(() => {
+          $$.onSelectPostPet(0)
+        })
+      ForEach($$.pets, (pet: Pet) => {
+        Button($$.selectedPostPetId === pet.id ? `${pet.name} 已选` : pet.name)
+          .height(36)
+          .fontSize(12)
+          .fontColor($$.selectedPostPetId === pet.id ? '#FFFFFF' : PetPalTheme.text)
+          .backgroundColor($$.selectedPostPetId === pet.id ? PetPalTheme.primary : PetPalTheme.surfaceWarm)
+          .borderRadius(PetPalTheme.radiusChip)
+          .onClick(() => {
+            $$.onSelectPostPet(pet.id)
+          })
       })
+    }
+    .width('100%')
+    if ($$.pets.length === 0) {
+      Text('当前账号下还没有宠物档案，默认按不关联宠物发布。')
+        .fontSize(12)
+        .lineHeight(18)
+        .fontColor(PetPalTheme.textMuted)
+    }
     if ($$.postImageUrls.length > 0) {
       Row({ space: 8 }) {
         ForEach($$.postImageUrls, (imageUrl: string) => {
@@ -103,11 +152,11 @@ function PostComposer($$: CommunityTabProps) {
 function JournalPostCard(item: Post, featured: boolean, $$: CommunityTabProps) {
   Column({ space: 14 }) {
     Row({ space: 12 }) {
-      Image(item.authorAvatarUrl)
-        .width(44)
-        .height(44)
-        .objectFit(ImageFit.Cover)
-        .borderRadius(22)
+      CommunityAuthorAvatar({
+        imageUrl: item.authorAvatarUrl,
+        label: item.authorName.length > 0 ? item.authorName.substring(0, 1) : '友',
+        avatarSize: 44
+      })
       Column({ space: 4 }) {
         Text(item.authorName)
           .fontSize(17)

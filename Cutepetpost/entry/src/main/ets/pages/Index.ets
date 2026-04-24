@@ -48,7 +48,7 @@ struct Index {
   @State postUploading: boolean = false
   @State postActionId: number = 0
   @State postContent: string = ''
-  @State postPetIdText: string = ''
+  @State selectedPostPetId: number = 0
   @State postImageUrls: string[] = []
   @State petArchiveMessage: string = ''
   @State petArchiveError: string = ''
@@ -83,6 +83,7 @@ struct Index {
         this.user = EMPTY_USER
         this.pets = []
         this.appointments = []
+        this.selectedPostPetId = 0
         return
       }
       this.isAuthenticated = true
@@ -92,6 +93,9 @@ struct Index {
       this.user = user
       this.pets = remotePets
       this.appointments = remoteAppointments
+      if (this.selectedPostPetId > 0 && !remotePets.some((pet: Pet) => pet.id === this.selectedPostPetId)) {
+        this.selectedPostPetId = 0
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.posts = PetPalRepository.getPosts()
@@ -185,7 +189,7 @@ struct Index {
 
   private resetPostComposer(): void {
     this.postContent = ''
-    this.postPetIdText = ''
+    this.selectedPostPetId = 0
     this.postImageUrls = []
   }
 
@@ -290,13 +294,8 @@ struct Index {
         content: content,
         imageUrls: this.postImageUrls
       }
-      const petIdText = this.postPetIdText.trim()
-      if (petIdText.length > 0) {
-        const petId = Number(petIdText)
-        if (petId !== petId || petId <= 0) {
-          throw new Error('宠物 ID 必须是正整数')
-        }
-        input.petId = petId
+      if (this.selectedPostPetId > 0) {
+        input.petId = this.selectedPostPetId
       }
       const created = await PetPalRepository.createPost(input)
       this.posts = [created].concat(this.posts.filter((item: Post) => item.id !== created.id))
@@ -408,6 +407,7 @@ struct Index {
           CommunityTab({
             isAuthenticated: this.isAuthenticated,
             refreshing: this.refreshing,
+            pets: this.pets,
             posts: this.posts,
             communityMessage: this.communityMessage,
             communityError: this.communityError,
@@ -416,7 +416,7 @@ struct Index {
             postUploading: this.postUploading,
             postActionId: this.postActionId,
             postContent: this.postContent,
-            postPetIdText: this.postPetIdText,
+            selectedPostPetId: this.selectedPostPetId,
             postImageUrls: this.postImageUrls,
             userId: this.user.id,
             onGoLogin: () => {
@@ -428,8 +428,8 @@ struct Index {
             onPostContentChange: (value: string) => {
               this.postContent = value
             },
-            onPostPetIdTextChange: (value: string) => {
-              this.postPetIdText = value
+            onSelectPostPet: (petId: number) => {
+              this.selectedPostPetId = petId
             },
             onUploadImages: () => {
               void this.pickPostImages()

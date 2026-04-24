@@ -426,7 +426,11 @@ export class PetPalRepository {
   }
 
   static async createPost(input: PostCreateInput): Promise<Post> {
-    const payload = await PetPalRepository.request<BackendPost>('/post', http.RequestMethod.POST, input);
+    const payload = await PetPalRepository.request<BackendPost>(
+      '/post',
+      http.RequestMethod.POST,
+      PetPalRepository.normalizePostCreateInput(input)
+    );
     const mapped = PetPalRepository.mapPost(payload);
     PetPalRepository.postCache = [mapped].concat(PetPalRepository.postCache.filter((item: Post) => item.id !== mapped.id));
     return mapped;
@@ -491,7 +495,7 @@ export class PetPalRepository {
     );
     return {
       fileKey: payload.fileKey,
-      url: payload.url
+      url: PetPalRepository.resolveMediaUrl(payload.url)
     };
   }
 
@@ -594,6 +598,78 @@ export class PetPalRepository {
   private static normalizeBaseUrl(baseUrl: string): string {
     const normalized = baseUrl.trim();
     return normalized.endsWith('/') ? normalized.slice(0, normalized.length - 1) : normalized;
+  }
+
+  private static normalizePostCreateInput(input: PostCreateInput): PostCreateInput {
+    const normalized: PostCreateInput = {
+      content: input.content
+    };
+    if (input.petId !== undefined) {
+      normalized.petId = input.petId;
+    }
+    if (input.imageUrls !== undefined) {
+      const imageUrls: string[] = [];
+      for (let index = 0; index < input.imageUrls.length; index++) {
+        const normalizedUrl = PetPalRepository.normalizeMediaUrlForWrite(input.imageUrls[index]);
+        if (normalizedUrl.length > 0) {
+          imageUrls.push(normalizedUrl);
+        }
+      }
+      if (imageUrls.length > 0) {
+        normalized.imageUrls = imageUrls;
+      }
+    }
+    return normalized;
+  }
+
+  private static serverOrigin(): string {
+    const apiMarker = '/api';
+    const markerIndex = PetPalRepository.apiBaseUrl.lastIndexOf(apiMarker);
+    if (markerIndex > 0) {
+      return PetPalRepository.apiBaseUrl.substring(0, markerIndex);
+    }
+    return PetPalRepository.apiBaseUrl;
+  }
+
+  private static extractBackendProxyPath(url: string): string | null {
+    const trimmed = url.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+    const marker = '/api/file/object/';
+    const markerIndex = trimmed.indexOf(marker);
+    if (markerIndex >= 0) {
+      const proxyPath = trimmed.substring(markerIndex);
+      return proxyPath.length > marker.length ? proxyPath : null;
+    }
+    if (trimmed.startsWith('/')) {
+      return trimmed;
+    }
+    return null;
+  }
+
+  private static resolveMediaUrl(url: string): string {
+    const trimmed = url.trim();
+    if (trimmed.length === 0) {
+      return '';
+    }
+    const proxyPath = PetPalRepository.extractBackendProxyPath(trimmed);
+    if (proxyPath !== null) {
+      return `${PetPalRepository.serverOrigin()}${proxyPath}`;
+    }
+    return trimmed;
+  }
+
+  private static normalizeMediaUrlForWrite(url: string): string {
+    const trimmed = url.trim();
+    if (trimmed.length === 0) {
+      return '';
+    }
+    const proxyPath = PetPalRepository.extractBackendProxyPath(trimmed);
+    if (proxyPath !== null) {
+      return proxyPath;
+    }
+    return trimmed;
   }
 
   private static configureApiClient(): void {
@@ -726,7 +802,7 @@ export class PetPalRepository {
       id: profile.id,
       nickname: profile.nickname,
       bio: profile.bio,
-      avatarUrl: profile.avatarUrl,
+      avatarUrl: PetPalRepository.resolveMediaUrl(profile.avatarUrl),
       followingCount: profile.followingCount,
       followerCount: profile.followerCount
     };
@@ -742,7 +818,7 @@ export class PetPalRepository {
       gender: PetPalRepository.mapGender(item.gender),
       birthday: item.birthday ?? "",
       weight: item.weight === undefined || item.weight === null ? "" : `${item.weight}`,
-      avatarUrl: item.avatarUrl ?? "",
+      avatarUrl: item.avatarUrl === undefined || item.avatarUrl === null ? "" : PetPalRepository.resolveMediaUrl(item.avatarUrl),
       neutered: item.neutered
     };
     return result;
@@ -778,7 +854,7 @@ export class PetPalRepository {
       address: item.address,
       phone: item.phone,
       rating: item.rating.toFixed(1),
-      coverUrl: item.coverUrl,
+      coverUrl: PetPalRepository.resolveMediaUrl(item.coverUrl),
       businessHours: item.businessHours
     };
     return result;
@@ -814,11 +890,11 @@ export class PetPalRepository {
       id: item.id,
       userId: item.userId ?? 0,
       authorName: item.userNickname,
-      authorAvatarUrl: item.userAvatarUrl,
+      authorAvatarUrl: PetPalRepository.resolveMediaUrl(item.userAvatarUrl),
       petId: item.petId ?? undefined,
       petName: item.petName ?? 'PetPal',
       content: item.content,
-      imageUrls: item.imageUrls ?? [],
+      imageUrls: (item.imageUrls ?? []).map((imageUrl: string) => PetPalRepository.resolveMediaUrl(imageUrl)),
       topics: item.topics ?? [],
       likeCount: item.likeCount,
       commentCount: item.commentCount,

@@ -269,7 +269,7 @@ Post create request:
   "petId": 1,
   "content": "Nuomi finished the vaccine today.",
   "imageUrls": [
-    "http://192.168.1.3:18080/api/file/object/community/example.jpg"
+    "/api/file/object/community/example.jpg"
   ]
 }
 ```
@@ -319,7 +319,7 @@ Success data:
 ```json
 {
   "fileKey": "community/example.jpg",
-  "url": "http://192.168.1.3:18080/api/file/object/community/example.jpg"
+  "url": "/api/file/object/community/example.jpg"
 }
 ```
 
@@ -332,7 +332,7 @@ Upload limits and errors:
 - Oversized file or multipart size limit returns `400 FILE_TOO_LARGE`.
 - Storage failure returns `500 FILE_UPLOAD_FAILED`.
 - Missing object reads return `404 FILE_NOT_FOUND`.
-- The returned `url` is a backend proxy URL. The phone client must not persist MinIO direct URLs as durable image URLs.
+- The returned `url` is a backend proxy path. The phone client may resolve it against the current backend origin for display, but must not persist MinIO direct URLs as durable image URLs.
 
 ## Admin Appointment Status
 

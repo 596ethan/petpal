@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CommunityQueryService {
+  private static final String BACKEND_FILE_OBJECT_PREFIX = "/api/file/object/";
   private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private static final Pattern TOPIC_PATTERN = Pattern.compile("#([\\p{IsAlphabetic}\\p{IsIdeographic}0-9_]+)");
   private static final int DEFAULT_FEED_LIMIT = 20;
@@ -154,7 +155,7 @@ public class CommunityQueryService {
   }
 
   private List<String> loadImages(Long postId) {
-    return jdbcClient.sql("""
+    List<String> rawImageUrls = jdbcClient.sql("""
       SELECT image_url
       FROM post_image
       WHERE post_id = :postId
@@ -163,6 +164,11 @@ public class CommunityQueryService {
       .param("postId", postId)
       .query(String.class)
       .list();
+    List<String> normalizedImageUrls = new ArrayList<>();
+    for (String rawImageUrl : rawImageUrls) {
+      normalizedImageUrls.add(canonicalizeImageUrl(rawImageUrl));
+    }
+    return normalizedImageUrls;
   }
 
   private Map<Long, List<String>> loadImages(List<Long> postIds) {
@@ -177,9 +183,17 @@ public class CommunityQueryService {
       .list();
     Map<Long, List<String>> imagesByPostId = new LinkedHashMap<>();
     for (PostImageRow imageRow : imageRows) {
-      imagesByPostId.computeIfAbsent(imageRow.postId(), id -> new ArrayList<>()).add(imageRow.imageUrl());
+      imagesByPostId.computeIfAbsent(imageRow.postId(), id -> new ArrayList<>()).add(canonicalizeImageUrl(imageRow.imageUrl()));
     }
     return imagesByPostId;
+  }
+
+  private String canonicalizeImageUrl(String imageUrl) {
+    int markerIndex = imageUrl.indexOf(BACKEND_FILE_OBJECT_PREFIX);
+    if (markerIndex >= 0) {
+      return imageUrl.substring(markerIndex);
+    }
+    return imageUrl;
   }
 
   private boolean isLikedByCurrentUser(Long postId, Long currentUserId) {
