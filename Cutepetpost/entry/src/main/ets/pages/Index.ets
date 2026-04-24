@@ -29,6 +29,18 @@ const EMPTY_USER: UserProfile = {
   followerCount: 0
 };
 
+interface ProviderDetailRouteParams {
+  providerId: string;
+}
+
+interface PostDetailRouteParams {
+  postId: string;
+}
+
+interface PetDetailRouteParams {
+  petId: string;
+}
+
 @Entry
 @Component
 struct Index {
@@ -353,20 +365,32 @@ struct Index {
     }
   }
 
+  private navigateTo(url: string, params?: Object): void {
+    try {
+      void this.getUIContext().getRouter().pushUrl({ url: url, params: params })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.refreshError = `页面跳转失败：${message}`
+    }
+  }
+
   private goToLogin(): void {
-    void this.getUIContext().getRouter().pushUrl({ url: 'pages/Login' })
+    this.navigateTo('pages/Login')
   }
 
   private openProviderDetail(providerId: number): void {
-    void this.getUIContext().getRouter().pushUrl({ url: 'pages/ProviderDetail', params: { providerId: `${providerId}` } })
+    const params: ProviderDetailRouteParams = { providerId: `${providerId}` }
+    this.navigateTo('pages/ProviderDetail', params)
   }
 
   private openPostDetail(postId: number): void {
-    void this.getUIContext().getRouter().pushUrl({ url: 'pages/PostDetail', params: { postId: `${postId}` } })
+    const params: PostDetailRouteParams = { postId: `${postId}` }
+    this.navigateTo('pages/PostDetail', params)
   }
 
   private openPetDetail(petId: number): void {
-    void this.getUIContext().getRouter().pushUrl({ url: 'pages/PetDetail', params: { petId: `${petId}` } })
+    const params: PetDetailRouteParams = { petId: `${petId}` }
+    this.navigateTo('pages/PetDetail', params)
   }
 
   private togglePostComposer(): void {
