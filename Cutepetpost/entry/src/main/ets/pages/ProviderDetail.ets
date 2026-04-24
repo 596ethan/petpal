@@ -2,6 +2,16 @@
 import { AppointmentCreateInput, PetPalRepository } from '../repository/PetPalRepository';
 import { PetPalTheme, providerSurface, providerTone, providerTypeText } from '../ui/PetPalTheme';
 
+const APPOINTMENT_TIME_SLOTS: string[] = ['09:00', '10:30', '14:00', '15:30', '17:00'];
+const APPOINTMENT_TIME_SLOT_FIRST_ROW: string[] = ['09:00', '10:30', '14:00'];
+const APPOINTMENT_TIME_SLOT_SECOND_ROW: string[] = ['15:30', '17:00'];
+
+interface AppointmentDateOption {
+  value: string;
+  label: string;
+  description: string;
+}
+
 @Builder
 function ProviderChip(label: string, backgroundColor: string, fontColor: string) {
   Text(label)
@@ -32,7 +42,8 @@ struct ProviderDetail {
   @State pets: Pet[] = []
   @State selectedServiceId: number = 0
   @State selectedPetId: number = 0
-  @State appointmentTime: string = this.buildDefaultAppointmentTime()
+  @State selectedAppointmentDate: string = this.formatDate(new Date())
+  @State selectedAppointmentSlot: string = ''
   @State remark: string = ''
   @State refreshError: string = ''
   @State actionError: string = ''
@@ -53,9 +64,6 @@ struct ProviderDetail {
       if (items.length > 0 && this.selectedServiceId === 0) {
         this.selectedServiceId = items[0].id
       }
-      if (this.appointmentTime.length === 0) {
-        this.appointmentTime = this.buildDefaultAppointmentTime()
-      }
       if (PetPalRepository.getSession() !== null) {
         const remotePets = await PetPalRepository.getPetsAsync()
         this.pets = remotePets
@@ -71,34 +79,102 @@ struct ProviderDetail {
     }
   }
 
-  private buildDefaultAppointmentTime(): string {
-    const nextDay = new Date()
-    nextDay.setDate(nextDay.getDate() + 1)
-    const year = `${nextDay.getFullYear()}`
-    const month = `${nextDay.getMonth() + 1}`.padStart(2, '0')
-    const day = `${nextDay.getDate()}`.padStart(2, '0')
-    return `${year}-${month}-${day} 10:00`
+  private formatDate(value: Date): string {
+    const year = `${value.getFullYear()}`
+    const month = `${value.getMonth() + 1}`.padStart(2, '0')
+    const day = `${value.getDate()}`.padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  private buildDateOption(offsetDays: number, label: string): AppointmentDateOption {
+    const date = new Date()
+    date.setDate(date.getDate() + offsetDays)
+    return {
+      value: this.formatDate(date),
+      label: label,
+      description: this.formatDate(date)
+    }
+  }
+
+  private getAppointmentDateOptions(): AppointmentDateOption[] {
+    return [
+      this.buildDateOption(0, '今天'),
+      this.buildDateOption(1, '明天'),
+      this.buildDateOption(2, '后天')
+    ]
+  }
+
+  private buildCandidateDateTime(dateValue: string, slot: string): Date {
+    const dateParts = dateValue.split('-')
+    const timeParts = slot.split(':')
+    return new Date(
+      Number(dateParts[0]),
+      Number(dateParts[1]) - 1,
+      Number(dateParts[2]),
+      Number(timeParts[0]),
+      Number(timeParts[1]),
+      0
+    )
+  }
+
+  private getAvailableTimeSlots(dateValue: string): string[] {
+    if (dateValue !== this.formatDate(new Date())) {
+      return APPOINTMENT_TIME_SLOTS
+    }
+    const cutoff = new Date()
+    cutoff.setMinutes(cutoff.getMinutes() + 30)
+    return APPOINTMENT_TIME_SLOTS.filter((slot: string): boolean => {
+      return this.buildCandidateDateTime(dateValue, slot).getTime() > cutoff.getTime()
+    })
+  }
+
+  private selectAppointmentDate(value: string): void {
+    this.selectedAppointmentDate = value
+    const availableSlots = this.getAvailableTimeSlots(value)
+    if (availableSlots.indexOf(this.selectedAppointmentSlot) < 0) {
+      this.selectedAppointmentSlot = ''
+    }
+  }
+
+  private buildAppointmentIntentTime(): string {
+    if (this.selectedAppointmentDate.length === 0 || this.selectedAppointmentSlot.length === 0) {
+      return ''
+    }
+    if (this.getAvailableTimeSlots(this.selectedAppointmentDate).indexOf(this.selectedAppointmentSlot) < 0) {
+      return ''
+    }
+    return `${this.selectedAppointmentDate}T${this.selectedAppointmentSlot}:00`
+  }
+
+  private showActionError(message: string): void {
+    this.actionError = message
+    this.actionMessage = ''
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: message })
+    } catch (_) {
+      // Keep the inline error visible even if toast is unavailable in a test/runtime context.
+    }
   }
 
   private async submitAppointment(): Promise<void> {
     if (PetPalRepository.getSession() === null) {
-      this.actionError = '请先登录后再预约'
+      this.showActionError('请先登录后再预约')
       return
     }
     if (this.creating) {
       return
     }
-    if (this.selectedPetId === 0 || this.selectedServiceId === 0) {
-      this.actionError = '请选择宠物和服务项目'
+    if (this.selectedServiceId === 0) {
+      this.showActionError('请选择服务项目')
       return
     }
-    if (this.appointmentTime.trim().length === 0) {
-      this.actionError = '请输入预约时间，格式如 2026-04-13 10:00:00'
+    if (this.selectedPetId === 0) {
+      this.showActionError('请选择宠物')
       return
     }
-    const appointmentTime = this.normalizeAppointmentTime(this.appointmentTime.trim())
+    const appointmentTime = this.buildAppointmentIntentTime()
     if (appointmentTime.length === 0) {
-      this.actionError = '预约时间格式不正确，请使用 2026-04-13 10:00:00'
+      this.showActionError('请选择预约意向时间')
       return
     }
     this.creating = true
@@ -122,21 +198,12 @@ struct ProviderDetail {
     }
   }
 
-  private normalizeAppointmentTime(value: string): string {
-    const normalized = value.replace(' ', 'T')
-    const pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/
-    if (!pattern.test(normalized)) {
-      return ''
-    }
-    return normalized.length === 16 ? `${normalized}:00` : normalized
-  }
-
   private toAppointmentErrorMessage(message: string): string {
     if (message.includes('INVALID_APPOINTMENT_TIME')) {
-      return '预约时间格式不正确，请使用 2026-04-13 10:00:00'
+      return '预约意向时间格式不正确'
     }
     if (message.includes('APPOINTMENT_TIME_IN_PAST')) {
-      return '预约时间必须晚于当前时间'
+      return '预约意向时间必须晚于当前时间'
     }
     if (message.includes('PET_NOT_AVAILABLE')) {
       return '请选择当前账号下的宠物'
@@ -281,7 +348,7 @@ struct ProviderDetail {
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor(PetPalTheme.text)
-      Text('先选择服务和宠物，再提交一个真实的预约请求。')
+      Text('先选择服务和宠物，再提交预约意向时间。')
         .fontSize(13)
         .lineHeight(20)
         .fontColor(PetPalTheme.textMuted)
@@ -312,17 +379,7 @@ struct ProviderDetail {
             })
         })
       }
-      Text('预约时间')
-        .fontSize(12)
-        .fontColor(PetPalTheme.textSubtle)
-      TextInput({ text: this.appointmentTime, placeholder: '例如 2026-04-13 10:00:00' })
-        .height(50)
-        .backgroundColor(PetPalTheme.surfaceRaised)
-        .borderRadius(18)
-        .padding({ left: 12, right: 12 })
-        .onChange((value: string) => {
-          this.appointmentTime = value
-        })
+      this.AppointmentTimeSection()
       Text('备注')
         .fontSize(12)
         .fontColor(PetPalTheme.textSubtle)
@@ -367,6 +424,77 @@ struct ProviderDetail {
     .padding(18)
     .backgroundColor(PetPalTheme.surface)
     .borderRadius(PetPalTheme.radiusPanel)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  AppointmentTimeSlotButton(slot: string) {
+    Button(this.selectedAppointmentSlot === slot ? `${slot} 已选` : slot)
+      .width(82)
+      .height(36)
+      .fontSize(12)
+      .fontColor(this.selectedAppointmentSlot === slot ? '#FFFFFF' : PetPalTheme.text)
+      .backgroundColor(this.selectedAppointmentSlot === slot ? PetPalTheme.primary : PetPalTheme.surfaceWarm)
+      .borderRadius(PetPalTheme.radiusChip)
+      .onClick(() => {
+        this.selectedAppointmentSlot = slot
+      })
+  }
+
+  @Builder
+  AppointmentTimeSection() {
+    Column({ space: 10 }) {
+      Text('预约意向时间')
+        .fontSize(12)
+        .fontColor(PetPalTheme.textSubtle)
+      Text('选择预约意向时间，最终以机构确认为准')
+        .fontSize(12)
+        .lineHeight(18)
+        .fontColor(PetPalTheme.textMuted)
+      Row({ space: 8 }) {
+        ForEach(this.getAppointmentDateOptions(), (option: AppointmentDateOption) => {
+          Button(this.selectedAppointmentDate === option.value ? `${option.label} 已选` : option.label)
+            .height(36)
+            .fontSize(12)
+            .fontColor(this.selectedAppointmentDate === option.value ? '#FFFFFF' : PetPalTheme.text)
+            .backgroundColor(this.selectedAppointmentDate === option.value ? providerTone(this.provider.type) : PetPalTheme.surfaceWarm)
+            .borderRadius(PetPalTheme.radiusChip)
+            .onClick(() => {
+              this.selectAppointmentDate(option.value)
+            })
+        })
+      }
+        Text(this.selectedAppointmentDate)
+          .fontSize(12)
+          .fontColor(PetPalTheme.textMuted)
+        if (this.getAvailableTimeSlots(this.selectedAppointmentDate).length > 0) {
+          Column({ space: 8 }) {
+            Row({ space: 8 }) {
+              ForEach(APPOINTMENT_TIME_SLOT_FIRST_ROW, (slot: string) => {
+                if (this.getAvailableTimeSlots(this.selectedAppointmentDate).indexOf(slot) >= 0) {
+                  this.AppointmentTimeSlotButton(slot)
+                }
+              })
+            }
+            Row({ space: 8 }) {
+              ForEach(APPOINTMENT_TIME_SLOT_SECOND_ROW, (slot: string) => {
+                if (this.getAvailableTimeSlots(this.selectedAppointmentDate).indexOf(slot) >= 0) {
+                  this.AppointmentTimeSlotButton(slot)
+                }
+              })
+            }
+          }
+          .alignItems(HorizontalAlign.Start)
+        } else {
+          Text('今天暂无可选时间')
+            .fontSize(12)
+          .fontColor(PetPalTheme.textMuted)
+          .padding({ left: 12, right: 12, top: 9, bottom: 9 })
+          .backgroundColor(PetPalTheme.surfaceRaised)
+          .borderRadius(PetPalTheme.radiusChip)
+      }
+    }
+    .width('100%')
     .alignItems(HorizontalAlign.Start)
   }
 }

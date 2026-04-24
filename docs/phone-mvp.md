@@ -80,6 +80,15 @@ A phone user can browse providers, provider details, service items, and their ow
 ### User goal
 A phone user selects a provider service and pet, chooses a time, adds an optional remark, creates an appointment, and cancels it when business rules allow.
 
+### Time input MVP rule
+Slice 3 currently treats the selected time as an appointment intent time, not a guaranteed provider schedule slot.
+
+- The phone client may present fixed date/time candidates as an input aid.
+- The page must tell the user that final service time depends on provider confirmation.
+- Today must hide time slots earlier than current time plus 30 minutes.
+- Tomorrow and the day after tomorrow may show the full fixed time-slot set.
+- This slice does not introduce provider schedule inventory, available-slot tables, or slot-management APIs.
+
 ### Entry screen
 - `Cutepetpost/entry/src/main/ets/pages/ProviderDetail.ets`
 - follow-up phone appointment flow screen to be added during implementation
