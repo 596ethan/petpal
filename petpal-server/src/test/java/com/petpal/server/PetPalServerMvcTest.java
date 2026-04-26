@@ -22,6 +22,7 @@ import com.petpal.server.common.error.GlobalExceptionHandler;
 import com.petpal.server.file.FileStorageService;
 import com.petpal.server.file.dto.FileDownloadDto;
 import com.petpal.server.file.dto.FileUploadDto;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -578,6 +580,208 @@ class PetPalServerMvcTest {
           """))
       .andExpect(status().isBadRequest())
       .andExpect(jsonPath("$.code").value("SERVICE_NOT_AVAILABLE"));
+  }
+
+  @Test
+  void createAppointmentRejectsDuplicateActiveAppointment() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    String appointmentTime = "2099-01-03T10:00:00";
+
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "%s",
+            "remark": "first booking"
+          }
+          """.formatted(appointmentTime)))
+      .andExpect(status().isOk());
+
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "%s",
+            "remark": "duplicate booking"
+          }
+          """.formatted(appointmentTime)))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.code").value("APPOINTMENT_CONFLICT"))
+      .andExpect(jsonPath("$.message").value("该宠物在此时间已有预约，请选择其他时间"));
+
+    Long activeDuplicateCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM appointment
+      WHERE user_id = 1
+        AND pet_id = 1
+        AND provider_id = 1
+        AND appointment_time = :appointmentTime
+        AND deleted = 0
+        AND status IN ('PENDING_CONFIRM', 'CONFIRMED')
+      """)
+      .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse(appointmentTime)))
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(activeDuplicateCount).isEqualTo(1L);
+  }
+
+  @Test
+  void createAppointmentAllowsRebookingAfterCancelled() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    String appointmentTime = "2099-01-04T10:00:00";
+
+    MvcResult firstCreate = mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "%s",
+            "remark": "booking before cancel"
+          }
+          """.formatted(appointmentTime)))
+      .andExpect(status().isOk())
+      .andReturn();
+
+    long appointmentId = readDataId(firstCreate.getResponse().getContentAsString());
+
+    mockMvc.perform(put("/api/appointment/{id}/cancel", appointmentId)
+        .header("Authorization", "Bearer " + accessToken))
+      .andExpect(status().isOk());
+
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "%s",
+            "remark": "booking after cancel"
+          }
+          """.formatted(appointmentTime)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.status").value("PENDING_CONFIRM"));
+  }
+
+  @Test
+  void createAppointmentAllowsRebookingAfterCompleted() throws Exception {
+    String accessToken = loginAndGetAccessToken("13800000001", "123456");
+    String appointmentTime = "2099-01-05T10:00:00";
+
+    MvcResult firstCreate = mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "%s",
+            "remark": "booking before complete"
+          }
+          """.formatted(appointmentTime)))
+      .andExpect(status().isOk())
+      .andReturn();
+
+    long appointmentId = readDataId(firstCreate.getResponse().getContentAsString());
+
+    mockMvc.perform(put("/admin/appointments/{id}/status", appointmentId)
+        .header("X-PetPal-Admin-Token", adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "status": "CONFIRMED"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+
+    mockMvc.perform(put("/admin/appointments/{id}/status", appointmentId)
+        .header("X-PetPal-Admin-Token", adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "status": "COMPLETED"
+          }
+          """))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+    mockMvc.perform(post("/api/appointment")
+        .header("Authorization", "Bearer " + accessToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""
+          {
+            "petId": 1,
+            "providerId": 1,
+            "serviceId": 1,
+            "appointmentTime": "%s",
+            "remark": "booking after complete"
+          }
+          """.formatted(appointmentTime)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.status").value("PENDING_CONFIRM"));
+  }
+
+  @Test
+  void appointmentTableUniqueConstraintBlocksActiveDuplicateInsert() {
+    String appointmentTime = "2099-01-06T10:00:00";
+
+    jdbcClient.sql("""
+      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
+      """)
+      .param("orderNo", "PP209901060001")
+      .param("userId", 1L)
+      .param("petId", 1L)
+      .param("providerId", 1L)
+      .param("serviceId", 1L)
+      .param("status", "PENDING_CONFIRM")
+      .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse(appointmentTime)))
+      .param("remark", "direct insert one")
+      .update();
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
+      """)
+        .param("orderNo", "PP209901060002")
+        .param("userId", 1L)
+        .param("petId", 1L)
+        .param("providerId", 1L)
+        .param("serviceId", 1L)
+        .param("status", "PENDING_CONFIRM")
+        .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse(appointmentTime)))
+        .param("remark", "direct insert two")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    Long activeDuplicateCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM appointment
+      WHERE user_id = 1
+        AND pet_id = 1
+        AND provider_id = 1
+        AND appointment_time = :appointmentTime
+        AND deleted = 0
+        AND status IN ('PENDING_CONFIRM', 'CONFIRMED')
+      """)
+      .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse(appointmentTime)))
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(activeDuplicateCount).isEqualTo(1L);
   }
 
   @Test

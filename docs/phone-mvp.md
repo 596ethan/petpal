@@ -104,6 +104,11 @@ Slice 3 currently treats the selected time as an appointment intent time, not a 
   - Success:
     - created appointment with generated `orderNo`
     - initial status `PENDING_CONFIRM`
+  - Failure:
+    - duplicate active appointment for the same `userId`, `petId`, `providerId`, and `appointmentTime` returns `409 APPOINTMENT_CONFLICT`
+    - active duplicate means `deleted = 0` and status in `PENDING_CONFIRM` or `CONFIRMED`
+    - `CANCELLED`, `COMPLETED`, or deleted appointments do not block rebooking the same time
+    - database unique-constraint fallback must return the same `409 APPOINTMENT_CONFLICT`
 - `PUT /api/appointment/{id}/cancel`
   - Success only for cancellable appointments
 - `PUT /admin/appointments/{id}/status`
@@ -120,6 +125,7 @@ Slice 3 currently treats the selected time as an appointment intent time, not a 
 - Past appointment time is rejected with a 400 JSON response.
 - Pet not owned by the current user is rejected with a 400 JSON response.
 - Service that does not belong to the selected provider is rejected with a 400 JSON response.
+- Duplicate active appointment is rejected with a 409 JSON response using code `APPOINTMENT_CONFLICT` and message `该宠物在此时间已有预约，请选择其他时间`.
 - Illegal status transitions are rejected.
 - Confirmed appointments within 2 hours cannot be cancelled by the user.
 - Phone client shows a clear error message and does not silently fall back to mock data for appointment creation.
@@ -131,10 +137,16 @@ Slice 3 currently treats the selected time as an appointment intent time, not a 
 - backend: appointment creation rejects past time
 - backend: appointment creation rejects pet not owned by current user
 - backend: appointment creation rejects service/provider mismatch
+- backend: appointment creation rejects duplicate active appointment
+- backend: appointment creation allows rebooking after cancellation
+- backend: appointment creation allows rebooking after completion
+- backend: database unique constraint blocks duplicate active insert
+- backend: database unique-constraint fallback returns `409 APPOINTMENT_CONFLICT`
 - backend: user can cancel `PENDING_CONFIRM`
 - backend: user cannot cancel confirmed appointment within 2 hours
 - backend: illegal admin transition fails
 - phone: submit success path
+- phone: duplicate active appointment shows `APPOINTMENT_CONFLICT` message
 - phone: cancel success path
 - phone: cancel failure messaging
 

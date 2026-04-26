@@ -142,8 +142,15 @@ CREATE TABLE appointment (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0,
+  active_duplicate_guard TINYINT GENERATED ALWAYS AS (
+    CASE
+      WHEN deleted = 0 AND status IN ('PENDING_CONFIRM', 'CONFIRMED') THEN 1
+      ELSE NULL
+    END
+  ),
   KEY idx_appointment_user_deleted (user_id, deleted, appointment_time),
-  KEY idx_appointment_provider_status (provider_id, status, appointment_time)
+  KEY idx_appointment_provider_status (provider_id, status, appointment_time),
+  UNIQUE KEY uk_appointment_active_duplicate (user_id, pet_id, provider_id, appointment_time, active_duplicate_guard)
 );
 
 CREATE TABLE service_review (

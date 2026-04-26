@@ -362,6 +362,35 @@ export default function petPalRepositoryTest() {
       }), 'Appointment time must be in the future');
     });
 
+    it('create appointment surfaces conflict message', 0, async () => {
+      PetPalRepository.storeSession({
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        profile: profilePayload() as UserProfile
+      });
+      PetPalRepository.setRequestHandlerForTest(async (): Promise<PetPalRepositoryResponse> => {
+        return {
+          responseCode: 409,
+          result: errorEnvelope('APPOINTMENT_CONFLICT', '该宠物在此时间已有预约，请选择其他时间')
+        };
+      });
+
+      let message = '';
+      try {
+        await PetPalRepository.createAppointment({
+          petId: 1,
+          providerId: 1,
+          serviceId: 1,
+          appointmentTime: '2099-01-02T10:00:00',
+          remark: ''
+        });
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message).assertContain('APPOINTMENT_CONFLICT');
+      expect(message).assertContain('该宠物在此时间已有预约，请选择其他时间');
+    });
+
     it('appointment list reports failure state', 0, async () => {
       PetPalRepository.storeSession({
         accessToken: 'access-token',

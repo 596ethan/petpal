@@ -12,13 +12,18 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AppointmentService {
   private static final DateTimeFormatter RESPONSE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+  private static final String APPOINTMENT_CONFLICT_CODE = "APPOINTMENT_CONFLICT";
+  private static final String APPOINTMENT_CONFLICT_MESSAGE = "该宠物在此时间已有预约，请选择其他时间";
+  private static final String ACTIVE_DUPLICATE_INDEX = "uk_appointment_active_duplicate";
   private final JdbcClient jdbcClient;
 
   public AppointmentService(JdbcClient jdbcClient) {
@@ -34,19 +39,27 @@ public class AppointmentService {
     if (!appointmentTime.isAfter(LocalDateTime.now())) {
       throw new AppException(400, "APPOINTMENT_TIME_IN_PAST", "Appointment time must be in the future");
     }
-    jdbcClient.sql("""
-      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
-      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
-      """)
-      .param("orderNo", orderNo)
-      .param("userId", userId)
-      .param("petId", request.petId())
-      .param("providerId", request.providerId())
-      .param("serviceId", request.serviceId())
-      .param("status", AppointmentStatus.PENDING_CONFIRM.name())
-      .param("appointmentTime", Timestamp.valueOf(appointmentTime))
-      .param("remark", request.remark())
-      .update();
+    ensureNoActiveDuplicateAppointment(userId, request.petId(), request.providerId(), appointmentTime);
+    try {
+      jdbcClient.sql("""
+        INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+        VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
+        """)
+        .param("orderNo", orderNo)
+        .param("userId", userId)
+        .param("petId", request.petId())
+        .param("providerId", request.providerId())
+        .param("serviceId", request.serviceId())
+        .param("status", AppointmentStatus.PENDING_CONFIRM.name())
+        .param("appointmentTime", Timestamp.valueOf(appointmentTime))
+        .param("remark", request.remark())
+        .update();
+    } catch (DataIntegrityViolationException ex) {
+      if (isActiveDuplicateConstraintViolation(ex)) {
+        throw appointmentConflictException();
+      }
+      throw ex;
+    }
     Long id = jdbcClient.sql("SELECT id FROM appointment WHERE order_no = :orderNo")
       .param("orderNo", orderNo)
       .query(Long.class)
@@ -155,6 +168,43 @@ public class AppointmentService {
     } catch (DateTimeParseException ex) {
       throw new AppException(400, "INVALID_APPOINTMENT_TIME", "Appointment time must use ISO 8601 format");
     }
+  }
+
+  private void ensureNoActiveDuplicateAppointment(long userId, Long petId, Long providerId, LocalDateTime appointmentTime) {
+    Long count = jdbcClient.sql("""
+      SELECT COUNT(*) FROM appointment
+      WHERE user_id = :userId
+        AND pet_id = :petId
+        AND provider_id = :providerId
+        AND appointment_time = :appointmentTime
+        AND deleted = 0
+        AND status IN (:pendingStatus, :confirmedStatus)
+      """)
+      .param("userId", userId)
+      .param("petId", petId)
+      .param("providerId", providerId)
+      .param("appointmentTime", Timestamp.valueOf(appointmentTime))
+      .param("pendingStatus", AppointmentStatus.PENDING_CONFIRM.name())
+      .param("confirmedStatus", AppointmentStatus.CONFIRMED.name())
+      .query(Long.class)
+      .single();
+    if (count != null && count > 0) {
+      throw appointmentConflictException();
+    }
+  }
+
+  private AppException appointmentConflictException() {
+    return new AppException(409, APPOINTMENT_CONFLICT_CODE, APPOINTMENT_CONFLICT_MESSAGE);
+  }
+
+  private boolean isActiveDuplicateConstraintViolation(DataIntegrityViolationException ex) {
+    Throwable mostSpecificCause = ex.getMostSpecificCause();
+    String detail = mostSpecificCause != null ? mostSpecificCause.getMessage() : ex.getMessage();
+    if (detail == null) {
+      return false;
+    }
+    String normalized = detail.toLowerCase(Locale.ROOT);
+    return normalized.contains(ACTIVE_DUPLICATE_INDEX) || normalized.contains("active_duplicate_guard");
   }
 
   private AppointmentRecord loadAppointmentRecord(Long appointmentId) {

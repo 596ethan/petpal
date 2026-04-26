@@ -190,6 +190,7 @@ struct ProviderDetail {
       }
       const created = await PetPalRepository.createAppointment(input)
       this.actionMessage = `预约成功：${created.orderNo}`
+      this.selectedAppointmentSlot = ''
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.actionError = `预约失败：${this.toAppointmentErrorMessage(message)}`
@@ -210,6 +211,9 @@ struct ProviderDetail {
     }
     if (message.includes('SERVICE_NOT_AVAILABLE')) {
       return '请选择该机构提供的服务项目'
+    }
+    if (message.includes('APPOINTMENT_CONFLICT')) {
+      return '该宠物在此时间已有预约，请选择其他时间'
     }
     return message
   }

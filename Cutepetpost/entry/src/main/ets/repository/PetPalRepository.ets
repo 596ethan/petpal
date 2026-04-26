@@ -584,6 +584,9 @@ export class PetPalRepository {
     }
 
     if (responseCode < 200 || responseCode >= 300) {
+      if (envelope?.code === 'APPOINTMENT_CONFLICT') {
+        throw new Error(`${envelope.code}: ${envelope.message}`);
+      }
       throw new Error(envelope?.message ?? `HTTP ${responseCode}`);
     }
     if (envelope === null) {
