@@ -828,6 +828,52 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2aRejectsCoreOrphanReferences() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet (owner_id, name, species, gender)
+      VALUES (:ownerId, :name, :species, :gender)
+      """)
+        .param("ownerId", 9999L)
+        .param("name", "orphan owner pet")
+        .param("species", "CAT")
+        .param("gender", "UNKNOWN")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet_health_record (pet_id, record_type, title, record_date)
+      VALUES (:petId, :recordType, :title, :recordDate)
+      """)
+        .param("petId", 9999L)
+        .param("recordType", "CHECKUP")
+        .param("title", "orphan pet health record")
+        .param("recordDate", java.sql.Date.valueOf("2099-01-01"))
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet_vaccine (pet_id, vaccine_name, vaccinated_at)
+      VALUES (:petId, :vaccineName, :vaccinatedAt)
+      """)
+        .param("petId", 9999L)
+        .param("vaccineName", "orphan pet vaccine")
+        .param("vaccinatedAt", java.sql.Date.valueOf("2099-01-01"))
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_item (provider_id, name, price, duration)
+      VALUES (:providerId, :name, :price, :duration)
+      """)
+        .param("providerId", 9999L)
+        .param("name", "orphan provider service")
+        .param("price", 88.00)
+        .param("duration", 30)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void dbIntegrityP1RejectsDuplicateFollowPair() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)

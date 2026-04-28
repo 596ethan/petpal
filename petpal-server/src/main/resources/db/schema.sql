@@ -35,7 +35,9 @@ CREATE TABLE pet (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0,
   KEY idx_pet_owner_deleted (owner_id, deleted),
-  UNIQUE KEY uk_pet_owner_id (owner_id, id)
+  UNIQUE KEY uk_pet_owner_id (owner_id, id),
+  CONSTRAINT fk_pet_owner
+    FOREIGN KEY (owner_id) REFERENCES user (id)
 );
 
 CREATE TABLE pet_health_record (
@@ -47,7 +49,9 @@ CREATE TABLE pet_health_record (
   record_date DATE NOT NULL,
   next_date DATE,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_pet_health_pet_record (pet_id, record_date, id)
+  KEY idx_pet_health_pet_record (pet_id, record_date, id),
+  CONSTRAINT fk_pet_health_record_pet
+    FOREIGN KEY (pet_id) REFERENCES pet (id)
 );
 
 CREATE TABLE pet_vaccine (
@@ -58,7 +62,9 @@ CREATE TABLE pet_vaccine (
   next_due_at DATE,
   hospital VARCHAR(100),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_pet_vaccine_pet_date (pet_id, vaccinated_at, id)
+  KEY idx_pet_vaccine_pet_date (pet_id, vaccinated_at, id),
+  CONSTRAINT fk_pet_vaccine_pet
+    FOREIGN KEY (pet_id) REFERENCES pet (id)
 );
 
 CREATE TABLE post (
@@ -140,7 +146,9 @@ CREATE TABLE service_item (
   ),
   KEY idx_service_item_provider_deleted (provider_id, deleted),
   UNIQUE KEY uk_service_item_provider_id (provider_id, id),
-  UNIQUE KEY uk_service_item_active_name (provider_id, name, active_name_guard)
+  UNIQUE KEY uk_service_item_active_name (provider_id, name, active_name_guard),
+  CONSTRAINT fk_service_item_provider
+    FOREIGN KEY (provider_id) REFERENCES service_provider (id)
 );
 
 CREATE TABLE appointment (
