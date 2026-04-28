@@ -15,7 +15,9 @@ CREATE TABLE user_follow (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   follower_id BIGINT NOT NULL,
   following_id BIGINT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_follow_pair (follower_id, following_id),
+  CONSTRAINT chk_user_follow_not_self CHECK (follower_id <> following_id)
 );
 
 CREATE TABLE pet (
@@ -83,7 +85,9 @@ CREATE TABLE post_image (
   image_url VARCHAR(1024) NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_post_image_post_sort (post_id, sort_order)
+  KEY idx_post_image_post_sort (post_id, sort_order),
+  UNIQUE KEY uk_post_image_sort (post_id, sort_order),
+  CONSTRAINT chk_post_image_sort_non_negative CHECK (sort_order >= 0)
 );
 
 CREATE TABLE post_like (
@@ -128,8 +132,15 @@ CREATE TABLE service_item (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0,
+  active_name_guard TINYINT GENERATED ALWAYS AS (
+    CASE
+      WHEN deleted = 0 THEN 1
+      ELSE NULL
+    END
+  ),
   KEY idx_service_item_provider_deleted (provider_id, deleted),
-  UNIQUE KEY uk_service_item_provider_id (provider_id, id)
+  UNIQUE KEY uk_service_item_provider_id (provider_id, id),
+  UNIQUE KEY uk_service_item_active_name (provider_id, name, active_name_guard)
 );
 
 CREATE TABLE appointment (

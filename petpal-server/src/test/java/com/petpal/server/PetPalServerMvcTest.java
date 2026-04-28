@@ -828,6 +828,170 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP1RejectsDuplicateFollowPair() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO user_follow (follower_id, following_id)
+      VALUES (:followerId, :followingId)
+      """)
+        .param("followerId", 1L)
+        .param("followingId", 2L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    Long duplicateCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM user_follow
+      WHERE follower_id = :followerId
+        AND following_id = :followingId
+      """)
+      .param("followerId", 1L)
+      .param("followingId", 2L)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(duplicateCount).isEqualTo(1L);
+  }
+
+  @Test
+  void dbIntegrityP1RejectsSelfFollow() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO user_follow (follower_id, following_id)
+      VALUES (:followerId, :followingId)
+      """)
+        .param("followerId", 1L)
+        .param("followingId", 1L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    Long selfFollowCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM user_follow
+      WHERE follower_id = :userId
+        AND following_id = :userId
+      """)
+      .param("userId", 1L)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(selfFollowCount).isZero();
+  }
+
+  @Test
+  void dbIntegrityP1RejectsDuplicatePostImageSortOrder() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post_image (post_id, image_url, sort_order)
+      VALUES (:postId, :imageUrl, :sortOrder)
+      """)
+        .param("postId", 1L)
+        .param("imageUrl", "https://example.com/duplicate-sort.png")
+        .param("sortOrder", 0)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    Long duplicateSortCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM post_image
+      WHERE post_id = :postId
+        AND sort_order = :sortOrder
+      """)
+      .param("postId", 1L)
+      .param("sortOrder", 0)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(duplicateSortCount).isEqualTo(1L);
+  }
+
+  @Test
+  void dbIntegrityP1RejectsNegativePostImageSortOrder() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post_image (post_id, image_url, sort_order)
+      VALUES (:postId, :imageUrl, :sortOrder)
+      """)
+        .param("postId", 1L)
+        .param("imageUrl", "https://example.com/negative-sort.png")
+        .param("sortOrder", -1)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    Long negativeSortCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM post_image
+      WHERE post_id = :postId
+        AND sort_order = :sortOrder
+      """)
+      .param("postId", 1L)
+      .param("sortOrder", -1)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(negativeSortCount).isZero();
+  }
+
+  @Test
+  void dbIntegrityP1RejectsDuplicateActiveServiceItemNamePerProvider() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_item (provider_id, name, price, duration, deleted)
+      SELECT provider_id, name, :price, :duration, :deleted
+      FROM service_item
+      WHERE id = :sourceId
+      """)
+        .param("price", 66.00)
+        .param("duration", 45)
+        .param("deleted", 0)
+        .param("sourceId", 1L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    Long activeCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM service_item
+      WHERE provider_id = (SELECT provider_id FROM service_item WHERE id = :sourceId)
+        AND name = (SELECT name FROM service_item WHERE id = :sourceId)
+        AND deleted = 0
+      """)
+      .param("sourceId", 1L)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(activeCount).isEqualTo(1L);
+  }
+
+  @Test
+  void dbIntegrityP1AllowsDeletedServiceItemNameToCoexistWithActive() {
+    int insertedRows = jdbcClient.sql("""
+      INSERT INTO service_item (provider_id, name, price, duration, deleted)
+      SELECT provider_id, name, :price, :duration, :deleted
+      FROM service_item
+      WHERE id = :sourceId
+      """)
+      .param("price", 66.00)
+      .param("duration", 45)
+      .param("deleted", 1)
+      .param("sourceId", 1L)
+      .update();
+
+    org.assertj.core.api.Assertions.assertThat(insertedRows).isEqualTo(1);
+
+    Long totalCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM service_item
+      WHERE provider_id = (SELECT provider_id FROM service_item WHERE id = :sourceId)
+        AND name = (SELECT name FROM service_item WHERE id = :sourceId)
+      """)
+      .param("sourceId", 1L)
+      .query(Long.class)
+      .single();
+
+    Long deletedCount = jdbcClient.sql("""
+      SELECT COUNT(*) FROM service_item
+      WHERE provider_id = (SELECT provider_id FROM service_item WHERE id = :sourceId)
+        AND name = (SELECT name FROM service_item WHERE id = :sourceId)
+        AND deleted = 1
+      """)
+      .param("sourceId", 1L)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(totalCount).isEqualTo(2L);
+    org.assertj.core.api.Assertions.assertThat(deletedCount).isEqualTo(1L);
+  }
+
+  @Test
   void cancelConfirmedAppointmentWithinTwoHoursFails() throws Exception {
     String accessToken = loginAndGetAccessToken("13800000001", "123456");
     String nearFuture = LocalDateTime.now().plusMinutes(90).withNano(0).toString();
