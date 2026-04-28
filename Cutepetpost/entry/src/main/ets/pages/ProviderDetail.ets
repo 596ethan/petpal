@@ -258,8 +258,18 @@ struct ProviderDetail {
         .lineHeight(20)
         .fontColor('#F3E4D6')
       Row({ space: 8 }) {
-        ProviderChip(`评分 ${this.provider.rating}`, 'rgba(255, 248, 243, 0.07)', '#FFF8F3')
-        ProviderChip(`营业 ${this.provider.businessHours}`, 'rgba(255, 248, 243, 0.07)', '#FFF8F3')
+        Text(`评分 ${this.provider.rating}`)
+          .fontSize(11)
+          .fontColor('#FFF8F3')
+          .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+          .backgroundColor('rgba(255, 248, 243, 0.07)')
+          .borderRadius(PetPalTheme.radiusChip)
+        Text(`营业 ${this.provider.businessHours}`)
+          .fontSize(11)
+          .fontColor('#FFF8F3')
+          .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+          .backgroundColor('rgba(255, 248, 243, 0.07)')
+          .borderRadius(PetPalTheme.radiusChip)
       }
     }
     .width('100%')
