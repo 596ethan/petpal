@@ -36,7 +36,7 @@ INSERT INTO appointment (id, order_no, user_id, pet_id, provider_id, service_id,
 
 INSERT INTO post (id, user_id, pet_id, content, like_count, comment_count, visibility, status, created_at, updated_at) VALUES
 (1, 1, 1, '糯米今天打完疫苗，回家后又趴在窗边晒太阳。#猫咪日常 #疫苗记录', 23, 1, 'PUBLIC', 'ACTIVE', '2026-03-24 18:20:00', '2026-03-24 18:20:00'),
-(2, 2, 2, '七七做完全套美容，耳朵边修得特别精神。#狗狗日常 #洗护记录', 56, 1, 'PUBLIC', 'ACTIVE', '2026-03-23 13:10:00', '2026-03-23 13:10:00');
+(2, 1, 2, '七七做完全套美容，耳朵边修得特别精神。#狗狗日常 #洗护记录', 56, 1, 'PUBLIC', 'ACTIVE', '2026-03-23 13:10:00', '2026-03-23 13:10:00');
 
 INSERT INTO post_image (post_id, image_url, sort_order) VALUES
 (1, 'https://loremflickr.com/400/300/cat?lock=201', 0),

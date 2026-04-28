@@ -32,7 +32,8 @@ CREATE TABLE pet (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0,
-  KEY idx_pet_owner_deleted (owner_id, deleted)
+  KEY idx_pet_owner_deleted (owner_id, deleted),
+  UNIQUE KEY uk_pet_owner_id (owner_id, id)
 );
 
 CREATE TABLE pet_health_record (
@@ -71,7 +72,9 @@ CREATE TABLE post (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0,
   KEY idx_post_user_status (user_id, status, deleted),
-  KEY idx_post_feed (deleted, status, created_at, id)
+  KEY idx_post_feed (deleted, status, created_at, id),
+  CONSTRAINT fk_post_user_pet
+    FOREIGN KEY (user_id, pet_id) REFERENCES pet (owner_id, id)
 );
 
 CREATE TABLE post_image (
@@ -125,7 +128,8 @@ CREATE TABLE service_item (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted TINYINT NOT NULL DEFAULT 0,
-  KEY idx_service_item_provider_deleted (provider_id, deleted)
+  KEY idx_service_item_provider_deleted (provider_id, deleted),
+  UNIQUE KEY uk_service_item_provider_id (provider_id, id)
 );
 
 CREATE TABLE appointment (
@@ -150,7 +154,11 @@ CREATE TABLE appointment (
   ),
   KEY idx_appointment_user_deleted (user_id, deleted, appointment_time),
   KEY idx_appointment_provider_status (provider_id, status, appointment_time),
-  UNIQUE KEY uk_appointment_active_duplicate (user_id, pet_id, provider_id, appointment_time, active_duplicate_guard)
+  UNIQUE KEY uk_appointment_active_duplicate (user_id, pet_id, provider_id, appointment_time, active_duplicate_guard),
+  CONSTRAINT fk_appointment_user_pet
+    FOREIGN KEY (user_id, pet_id) REFERENCES pet (owner_id, id),
+  CONSTRAINT fk_appointment_provider_service
+    FOREIGN KEY (provider_id, service_id) REFERENCES service_item (provider_id, id)
 );
 
 CREATE TABLE service_review (

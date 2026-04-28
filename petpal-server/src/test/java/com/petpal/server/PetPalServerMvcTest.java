@@ -785,6 +785,49 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void compositeForeignKeysBlockMismatchedPostAndAppointmentWrites() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post (user_id, pet_id, content)
+      VALUES (:userId, :petId, :content)
+      """)
+        .param("userId", 2L)
+        .param("petId", 1L)
+        .param("content", "direct mismatched post")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
+      """)
+        .param("orderNo", "PP209901070001")
+        .param("userId", 2L)
+        .param("petId", 1L)
+        .param("providerId", 1L)
+        .param("serviceId", 1L)
+        .param("status", "PENDING_CONFIRM")
+        .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse("2099-01-07T10:00:00")))
+        .param("remark", "direct mismatched pet")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
+      """)
+        .param("orderNo", "PP209901070002")
+        .param("userId", 1L)
+        .param("petId", 1L)
+        .param("providerId", 2L)
+        .param("serviceId", 1L)
+        .param("status", "PENDING_CONFIRM")
+        .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse("2099-01-07T11:00:00")))
+        .param("remark", "direct mismatched service")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void cancelConfirmedAppointmentWithinTwoHoursFails() throws Exception {
     String accessToken = loginAndGetAccessToken("13800000001", "123456");
     String nearFuture = LocalDateTime.now().plusMinutes(90).withNano(0).toString();
