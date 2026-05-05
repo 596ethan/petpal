@@ -946,6 +946,40 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2cRejectsInvalidAppointmentCheckValues() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :remark)
+      """)
+        .param("orderNo", "PP209901080001")
+        .param("userId", 1L)
+        .param("petId", 1L)
+        .param("providerId", 1L)
+        .param("serviceId", 1L)
+        .param("status", "RESCHEDULED")
+        .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse("2099-01-08T10:00:00")))
+        .param("remark", "invalid appointment status")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, deleted, remark)
+      VALUES (:orderNo, :userId, :petId, :providerId, :serviceId, :status, :appointmentTime, :deleted, :remark)
+      """)
+        .param("orderNo", "PP209901080002")
+        .param("userId", 1L)
+        .param("petId", 1L)
+        .param("providerId", 1L)
+        .param("serviceId", 1L)
+        .param("status", "PENDING_CONFIRM")
+        .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse("2099-01-08T11:00:00")))
+        .param("deleted", 2)
+        .param("remark", "invalid appointment deleted")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void dbIntegrityP1RejectsDuplicateFollowPair() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)

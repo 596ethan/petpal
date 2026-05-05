@@ -183,7 +183,11 @@ CREATE TABLE appointment (
   CONSTRAINT fk_appointment_user_pet
     FOREIGN KEY (user_id, pet_id) REFERENCES pet (owner_id, id),
   CONSTRAINT fk_appointment_provider_service
-    FOREIGN KEY (provider_id, service_id) REFERENCES service_item (provider_id, id)
+    FOREIGN KEY (provider_id, service_id) REFERENCES service_item (provider_id, id),
+  CONSTRAINT chk_appointment_status
+    CHECK (status IN ('PENDING_CONFIRM', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'EXPIRED')),
+  CONSTRAINT chk_appointment_deleted_bool
+    CHECK (deleted IN (0, 1))
 );
 
 CREATE TABLE service_review (
