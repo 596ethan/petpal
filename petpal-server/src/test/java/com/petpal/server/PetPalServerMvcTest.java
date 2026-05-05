@@ -874,6 +874,78 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2bRejectsInvalidPetArchiveCheckValues() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet (owner_id, name, species, gender)
+      VALUES (:ownerId, :name, :species, :gender)
+      """)
+        .param("ownerId", 1L)
+        .param("name", "invalid species pet")
+        .param("species", "HAMSTER")
+        .param("gender", "UNKNOWN")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet (owner_id, name, species, gender)
+      VALUES (:ownerId, :name, :species, :gender)
+      """)
+        .param("ownerId", 1L)
+        .param("name", "invalid gender pet")
+        .param("species", "CAT")
+        .param("gender", "OTHER")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet (owner_id, name, species, gender, weight)
+      VALUES (:ownerId, :name, :species, :gender, :weight)
+      """)
+        .param("ownerId", 1L)
+        .param("name", "invalid weight pet")
+        .param("species", "CAT")
+        .param("gender", "UNKNOWN")
+        .param("weight", 0.00)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet (owner_id, name, species, gender, is_neutered)
+      VALUES (:ownerId, :name, :species, :gender, :isNeutered)
+      """)
+        .param("ownerId", 1L)
+        .param("name", "invalid neutered pet")
+        .param("species", "CAT")
+        .param("gender", "UNKNOWN")
+        .param("isNeutered", 2)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet (owner_id, name, species, gender, deleted)
+      VALUES (:ownerId, :name, :species, :gender, :deleted)
+      """)
+        .param("ownerId", 1L)
+        .param("name", "invalid deleted pet")
+        .param("species", "CAT")
+        .param("gender", "UNKNOWN")
+        .param("deleted", 2)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO pet_health_record (pet_id, record_type, title, record_date)
+      VALUES (:petId, :recordType, :title, :recordDate)
+      """)
+        .param("petId", 1L)
+        .param("recordType", "ALLERGY")
+        .param("title", "invalid health record type")
+        .param("recordDate", java.sql.Date.valueOf("2099-01-01"))
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void dbIntegrityP1RejectsDuplicateFollowPair() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)

@@ -37,7 +37,12 @@ CREATE TABLE pet (
   KEY idx_pet_owner_deleted (owner_id, deleted),
   UNIQUE KEY uk_pet_owner_id (owner_id, id),
   CONSTRAINT fk_pet_owner
-    FOREIGN KEY (owner_id) REFERENCES user (id)
+    FOREIGN KEY (owner_id) REFERENCES user (id),
+  CONSTRAINT chk_pet_species CHECK (species IN ('DOG', 'CAT', 'RABBIT', 'BIRD', 'OTHER')),
+  CONSTRAINT chk_pet_gender CHECK (gender IN ('MALE', 'FEMALE', 'UNKNOWN')),
+  CONSTRAINT chk_pet_weight_range CHECK (weight IS NULL OR weight BETWEEN 0.01 AND 999.99),
+  CONSTRAINT chk_pet_is_neutered_bool CHECK (is_neutered IN (0, 1)),
+  CONSTRAINT chk_pet_deleted_bool CHECK (deleted IN (0, 1))
 );
 
 CREATE TABLE pet_health_record (
@@ -51,7 +56,8 @@ CREATE TABLE pet_health_record (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_pet_health_pet_record (pet_id, record_date, id),
   CONSTRAINT fk_pet_health_record_pet
-    FOREIGN KEY (pet_id) REFERENCES pet (id)
+    FOREIGN KEY (pet_id) REFERENCES pet (id),
+  CONSTRAINT chk_pet_health_record_type CHECK (record_type IN ('VACCINE', 'CHECKUP', 'MEDICATION', 'SURGERY'))
 );
 
 CREATE TABLE pet_vaccine (
