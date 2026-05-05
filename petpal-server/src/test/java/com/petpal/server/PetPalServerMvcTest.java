@@ -980,6 +980,81 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2eRejectsInvalidProviderServiceCheckValues() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_provider (name, type, address, rating, deleted)
+      VALUES (:name, :type, :address, :rating, :deleted)
+      """)
+        .param("name", "invalid provider type")
+        .param("type", "DAYCARE")
+        .param("address", "invalid provider address")
+        .param("rating", 4.0)
+        .param("deleted", 0)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_provider (name, type, address, rating, deleted)
+      VALUES (:name, :type, :address, :rating, :deleted)
+      """)
+        .param("name", "invalid provider rating")
+        .param("type", "HOSPITAL")
+        .param("address", "invalid provider address")
+        .param("rating", 5.1)
+        .param("deleted", 0)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_provider (name, type, address, rating, deleted)
+      VALUES (:name, :type, :address, :rating, :deleted)
+      """)
+        .param("name", "invalid provider deleted")
+        .param("type", "HOSPITAL")
+        .param("address", "invalid provider address")
+        .param("rating", 4.0)
+        .param("deleted", 2)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_item (provider_id, name, price, duration, deleted)
+      VALUES (:providerId, :name, :price, :duration, :deleted)
+      """)
+        .param("providerId", 1L)
+        .param("name", "invalid service price")
+        .param("price", -0.01)
+        .param("duration", 30)
+        .param("deleted", 0)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_item (provider_id, name, price, duration, deleted)
+      VALUES (:providerId, :name, :price, :duration, :deleted)
+      """)
+        .param("providerId", 1L)
+        .param("name", "invalid service duration")
+        .param("price", 0.00)
+        .param("duration", 0)
+        .param("deleted", 0)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO service_item (provider_id, name, price, duration, deleted)
+      VALUES (:providerId, :name, :price, :duration, :deleted)
+      """)
+        .param("providerId", 1L)
+        .param("name", "invalid service deleted")
+        .param("price", 0.00)
+        .param("duration", 30)
+        .param("deleted", 2)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void dbIntegrityP2dRejectsCommunityOrphanReferences() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)

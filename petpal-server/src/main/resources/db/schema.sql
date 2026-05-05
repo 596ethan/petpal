@@ -150,7 +150,10 @@ CREATE TABLE service_provider (
   status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0
+  deleted TINYINT NOT NULL DEFAULT 0,
+  CONSTRAINT chk_service_provider_type CHECK (type IN ('HOSPITAL', 'GROOMING', 'BOARDING')),
+  CONSTRAINT chk_service_provider_rating_range CHECK (rating BETWEEN 0.0 AND 5.0),
+  CONSTRAINT chk_service_provider_deleted_bool CHECK (deleted IN (0, 1))
 );
 
 CREATE TABLE service_item (
@@ -172,7 +175,10 @@ CREATE TABLE service_item (
   UNIQUE KEY uk_service_item_provider_id (provider_id, id),
   UNIQUE KEY uk_service_item_active_name (provider_id, name, active_name_guard),
   CONSTRAINT fk_service_item_provider
-    FOREIGN KEY (provider_id) REFERENCES service_provider (id)
+    FOREIGN KEY (provider_id) REFERENCES service_provider (id),
+  CONSTRAINT chk_service_item_price_non_negative CHECK (price >= 0.00),
+  CONSTRAINT chk_service_item_duration_positive CHECK (duration > 0),
+  CONSTRAINT chk_service_item_deleted_bool CHECK (deleted IN (0, 1))
 );
 
 CREATE TABLE appointment (
