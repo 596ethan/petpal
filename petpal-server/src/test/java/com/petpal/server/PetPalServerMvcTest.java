@@ -980,6 +980,95 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2dRejectsCommunityOrphanReferences() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO user_follow (follower_id, following_id)
+      VALUES (:followerId, :followingId)
+      """)
+        .param("followerId", 9999L)
+        .param("followingId", 1L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO user_follow (follower_id, following_id)
+      VALUES (:followerId, :followingId)
+      """)
+        .param("followerId", 1L)
+        .param("followingId", 9999L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post (user_id, content)
+      VALUES (:userId, :content)
+      """)
+        .param("userId", 9999L)
+        .param("content", "orphan post user")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post_image (post_id, image_url, sort_order)
+      VALUES (:postId, :imageUrl, :sortOrder)
+      """)
+        .param("postId", 9999L)
+        .param("imageUrl", "https://example.com/orphan-post-image.png")
+        .param("sortOrder", 0)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post_like (post_id, user_id)
+      VALUES (:postId, :userId)
+      """)
+        .param("postId", 9999L)
+        .param("userId", 1L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post_like (post_id, user_id)
+      VALUES (:postId, :userId)
+      """)
+        .param("postId", 1L)
+        .param("userId", 9999L)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO comment (post_id, user_id, content)
+      VALUES (:postId, :userId, :content)
+      """)
+        .param("postId", 9999L)
+        .param("userId", 1L)
+        .param("content", "orphan comment post")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO comment (post_id, parent_id, user_id, content)
+      VALUES (:postId, :parentId, :userId, :content)
+      """)
+        .param("postId", 1L)
+        .param("parentId", 9999L)
+        .param("userId", 1L)
+        .param("content", "orphan comment parent")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO comment (post_id, user_id, content)
+      VALUES (:postId, :userId, :content)
+      """)
+        .param("postId", 1L)
+        .param("userId", 9999L)
+        .param("content", "orphan comment user")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void dbIntegrityP1RejectsDuplicateFollowPair() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)

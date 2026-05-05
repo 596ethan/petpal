@@ -17,7 +17,11 @@ CREATE TABLE user_follow (
   following_id BIGINT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_user_follow_pair (follower_id, following_id),
-  CONSTRAINT chk_user_follow_not_self CHECK (follower_id <> following_id)
+  CONSTRAINT chk_user_follow_not_self CHECK (follower_id <> following_id),
+  CONSTRAINT fk_user_follow_follower
+    FOREIGN KEY (follower_id) REFERENCES user (id),
+  CONSTRAINT fk_user_follow_following
+    FOREIGN KEY (following_id) REFERENCES user (id)
 );
 
 CREATE TABLE pet (
@@ -87,6 +91,8 @@ CREATE TABLE post (
   deleted TINYINT NOT NULL DEFAULT 0,
   KEY idx_post_user_status (user_id, status, deleted),
   KEY idx_post_feed (deleted, status, created_at, id),
+  CONSTRAINT fk_post_user
+    FOREIGN KEY (user_id) REFERENCES user (id),
   CONSTRAINT fk_post_user_pet
     FOREIGN KEY (user_id, pet_id) REFERENCES pet (owner_id, id)
 );
@@ -99,7 +105,9 @@ CREATE TABLE post_image (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_post_image_post_sort (post_id, sort_order),
   UNIQUE KEY uk_post_image_sort (post_id, sort_order),
-  CONSTRAINT chk_post_image_sort_non_negative CHECK (sort_order >= 0)
+  CONSTRAINT chk_post_image_sort_non_negative CHECK (sort_order >= 0),
+  CONSTRAINT fk_post_image_post
+    FOREIGN KEY (post_id) REFERENCES post (id)
 );
 
 CREATE TABLE post_like (
@@ -107,7 +115,11 @@ CREATE TABLE post_like (
   post_id BIGINT NOT NULL,
   user_id BIGINT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (post_id, user_id)
+  UNIQUE (post_id, user_id),
+  CONSTRAINT fk_post_like_post
+    FOREIGN KEY (post_id) REFERENCES post (id),
+  CONSTRAINT fk_post_like_user
+    FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
 CREATE TABLE comment (
@@ -117,7 +129,13 @@ CREATE TABLE comment (
   user_id BIGINT NOT NULL,
   content VARCHAR(200) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_comment_post_parent_created (post_id, parent_id, created_at, id)
+  KEY idx_comment_post_parent_created (post_id, parent_id, created_at, id),
+  CONSTRAINT fk_comment_post
+    FOREIGN KEY (post_id) REFERENCES post (id),
+  CONSTRAINT fk_comment_parent
+    FOREIGN KEY (parent_id) REFERENCES comment (id),
+  CONSTRAINT fk_comment_user
+    FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
 CREATE TABLE service_provider (
