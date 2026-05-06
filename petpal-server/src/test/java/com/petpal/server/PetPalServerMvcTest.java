@@ -1109,6 +1109,31 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2gPostDerivedCountsMatchActualLikesAndRootComments() {
+    Long driftCount = jdbcClient.sql("""
+      SELECT COUNT(*)
+      FROM post p
+      LEFT JOIN (
+        SELECT post_id, COUNT(*) AS actual_count
+        FROM post_like
+        GROUP BY post_id
+      ) pl ON pl.post_id = p.id
+      LEFT JOIN (
+        SELECT post_id, COUNT(*) AS actual_count
+        FROM comment
+        WHERE parent_id IS NULL
+        GROUP BY post_id
+      ) c ON c.post_id = p.id
+      WHERE p.like_count <> COALESCE(pl.actual_count, 0)
+         OR p.comment_count <> COALESCE(c.actual_count, 0)
+      """)
+      .query(Long.class)
+      .single();
+
+    org.assertj.core.api.Assertions.assertThat(driftCount).isZero();
+  }
+
+  @Test
   void dbIntegrityP2dRejectsCommunityOrphanReferences() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)
@@ -1597,7 +1622,7 @@ class PetPalServerMvcTest {
     mockMvc.perform(get("/api/post/2")
         .header("Authorization", "Bearer " + accessToken))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.data.likeCount").value(57))
+      .andExpect(jsonPath("$.data.likeCount").value(1))
       .andExpect(jsonPath("$.data.liked").value(true));
 
     mockMvc.perform(delete("/api/post/2/like")
@@ -1610,7 +1635,7 @@ class PetPalServerMvcTest {
     mockMvc.perform(get("/api/post/2")
         .header("Authorization", "Bearer " + accessToken))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.data.likeCount").value(56))
+      .andExpect(jsonPath("$.data.likeCount").value(0))
       .andExpect(jsonPath("$.data.liked").value(false));
   }
 

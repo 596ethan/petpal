@@ -110,6 +110,8 @@ The live DB also reports these current unconstrained status values:
 
 `post.like_count` and `post.comment_count` now have non-negative CHECK constraints, but count correctness is separate. The live review found `post_like_count_drift = 2` and `post_comment_count_drift = 0`. Treat the like-count drift as a later derived-count audit or repair slice, not as a reason to add another CHECK.
 
+Follow-up: P2g repaired the live `post.like_count` drift and added a derived-count regression test. See `docs/db-integrity-p2g-derived-counts-acceptance.md`.
+
 ## Verification Run In This Review
 
 - `git status --short --branch`
