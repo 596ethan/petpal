@@ -8,7 +8,8 @@ CREATE TABLE user (
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0
+  deleted TINYINT NOT NULL DEFAULT 0,
+  CONSTRAINT chk_user_deleted_bool CHECK (deleted IN (0, 1))
 );
 
 CREATE TABLE user_follow (
@@ -94,7 +95,11 @@ CREATE TABLE post (
   CONSTRAINT fk_post_user
     FOREIGN KEY (user_id) REFERENCES user (id),
   CONSTRAINT fk_post_user_pet
-    FOREIGN KEY (user_id, pet_id) REFERENCES pet (owner_id, id)
+    FOREIGN KEY (user_id, pet_id) REFERENCES pet (owner_id, id),
+  CONSTRAINT chk_post_visibility CHECK (visibility IN ('PUBLIC', 'FOLLOWERS_ONLY', 'PRIVATE')),
+  CONSTRAINT chk_post_like_count_non_negative CHECK (like_count >= 0),
+  CONSTRAINT chk_post_comment_count_non_negative CHECK (comment_count >= 0),
+  CONSTRAINT chk_post_deleted_bool CHECK (deleted IN (0, 1))
 );
 
 CREATE TABLE post_image (

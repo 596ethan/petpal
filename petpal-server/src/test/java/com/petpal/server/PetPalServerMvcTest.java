@@ -1055,6 +1055,60 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void dbIntegrityP2fRejectsInvalidUserPostCheckValues() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO user (phone, password, nickname, deleted)
+      VALUES (:phone, :password, :nickname, :deleted)
+      """)
+        .param("phone", "13900000001")
+        .param("password", "encoded-password")
+        .param("nickname", "invalid user deleted")
+        .param("deleted", 2)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post (user_id, content, visibility)
+      VALUES (:userId, :content, :visibility)
+      """)
+        .param("userId", 1L)
+        .param("content", "invalid post visibility")
+        .param("visibility", "FRIENDS")
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post (user_id, content, like_count)
+      VALUES (:userId, :content, :likeCount)
+      """)
+        .param("userId", 1L)
+        .param("content", "invalid post like count")
+        .param("likeCount", -1)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post (user_id, content, comment_count)
+      VALUES (:userId, :content, :commentCount)
+      """)
+        .param("userId", 1L)
+        .param("content", "invalid post comment count")
+        .param("commentCount", -1)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
+      INSERT INTO post (user_id, content, deleted)
+      VALUES (:userId, :content, :deleted)
+      """)
+        .param("userId", 1L)
+        .param("content", "invalid post deleted")
+        .param("deleted", 2)
+        .update())
+      .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
   void dbIntegrityP2dRejectsCommunityOrphanReferences() {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbcClient.sql("""
       INSERT INTO user_follow (follower_id, following_id)
