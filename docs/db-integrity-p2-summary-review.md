@@ -14,7 +14,7 @@ Live MySQL version: `8.0.40`
 
 Result: `schema.sql`, the maintenance scripts, the acceptance documents, and the live MySQL database are aligned for P0/P1/P2a-P2g. All expected P0/P1/P2a-P2f constraints are present in live MySQL, P2g has no DDL constraints, and all covered invalid-count/drift checks returned `0`.
 
-This is a summary review only. No schema, DDL, seed data, backend API, phone client, or admin behavior was changed in this review update. Full P2 should still not be called sealed until the remaining candidates are either handled in separate slices or explicitly accepted as deferred.
+This is a summary review only. No schema, DDL, seed data, backend API, phone client, or admin behavior was changed in this review update. Full P2 should still not be called sealed. The remaining candidates have been moved out of the current database plan and into backlog.
 
 ## Stage Matrix
 
@@ -104,11 +104,15 @@ The live DB also reports these current unconstrained status values:
 | `post.status` | `ACTIVE = 7` |
 | `service_provider.status` | `OPEN = 3` |
 
-## Remaining Items
+## Backlog Items
 
-`service_review` still has no FK or rating CHECK constraints in `schema.sql` or live MySQL. The live read-only review found `0` appointment orphans, `0` user orphans, `0` provider orphans, and `0` rating out-of-range rows. Because `service_review` is not on the current phone MVP main flow, handle it later as a small independent slice if it becomes product-relevant.
+`service_review` still has no FK or rating CHECK constraints in `schema.sql` or live MySQL. The live read-only review found `0` appointment orphans, `0` user orphans, `0` provider orphans, and `0` rating out-of-range rows. This is now backlog, not part of the current database plan.
 
-`user.status`, `post.status`, and `service_provider.status` still have no CHECK constraints. Current live rows are clean, but the code does not provide equally stable enum boundaries for all three. In particular, provider admin currently accepts arbitrary uppercased provider statuses, and existing tests cover `PAUSED`; adding a DB CHECK now would be a behavior decision, not only a DB integrity cleanup.
+`user.status`, `post.status`, and `service_provider.status` still have no CHECK constraints. Current live rows are clean, but the code does not provide equally stable enum boundaries for all three. In particular, provider admin currently accepts arbitrary uppercased provider statuses, and existing tests cover `PAUSED`; adding a DB CHECK later would be a behavior decision, not only a DB integrity cleanup. This is now backlog.
+
+Automatic `updated_at` maintenance is backlog.
+
+A formal migration mechanism such as Flyway or Liquibase is backlog.
 
 `post.like_count` and `post.comment_count` now have non-negative CHECK constraints from P2f, and P2g repaired the live derived-count drift. The current summary script reports `post_derived_count_drift = 0`. This still does not add triggers; application write paths must keep counters aligned, and direct DB writes can still create future drift.
 

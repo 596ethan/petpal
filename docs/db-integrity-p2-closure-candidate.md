@@ -20,9 +20,9 @@ P0, P1, and P2a-P2g have been completed and applied to the live local MySQL `pet
 
 ## Not Sealed
 
-This is not a sealed P2 record because several candidates are intentionally deferred instead of closed.
+This is not a sealed P2 record because several candidates are intentionally moved out of the current database plan and into backlog.
 
-Deferred items:
+Backlog items:
 
 - `service_review` foreign keys and rating CHECK constraints.
 - `user.status`, `post.status`, and `service_provider.status` CHECK constraints.
