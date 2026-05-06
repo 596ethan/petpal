@@ -4,17 +4,17 @@
 
 Review date: 2026-05-06
 
-Branch: `codex/docs/db-integrity-p2-summary-review`
+Branch: `codex/docs/db-integrity-p2g-summary-review`
 
-Base commit: `1824098 fix: add user post db checks`
+Base commit: `799ae42 fix: repair post derived counts`
 
 Live database: local MySQL `petpal`
 
 Live MySQL version: `8.0.40`
 
-Result: `schema.sql`, the maintenance scripts, the acceptance documents, and the live MySQL database are aligned for P0/P1/P2a-P2f. All expected P0/P1/P2a-P2f constraints are present in live MySQL, and all covered invalid-count checks returned `0`.
+Result: `schema.sql`, the maintenance scripts, the acceptance documents, and the live MySQL database are aligned for P0/P1/P2a-P2g. All expected P0/P1/P2a-P2f constraints are present in live MySQL, P2g has no DDL constraints, and all covered invalid-count/drift checks returned `0`.
 
-This is a summary review only. No schema, DDL, seed data, backend API, phone client, or admin behavior was changed. Full P2 should still not be called sealed until the remaining candidates are either handled in separate slices or explicitly accepted as deferred.
+This is a summary review only. No schema, DDL, seed data, backend API, phone client, or admin behavior was changed in this review update. Full P2 should still not be called sealed until the remaining candidates are either handled in separate slices or explicitly accepted as deferred.
 
 ## Stage Matrix
 
@@ -28,6 +28,7 @@ This is a summary review only. No schema, DDL, seed data, backend API, phone cli
 | P2d community FKs | `1ff3cdb fix: add community db foreign keys` | `scripts/db-integrity-p2d-community-foreign-keys.sql` | `docs/db-integrity-p2d-community-foreign-keys-acceptance.md` | `_tmp_db_backup/petpal-live-before-db-integrity-p2d-community-foreign-keys-20260505-231144.sql` | `mvn -Dtest=PetPalServerMvcTest#dbIntegrityP2dRejectsCommunityOrphanReferences test`; `.\scripts\test-backend.ps1` passed with 60 tests | Direct orphan user follow, post, post image, post like, and comment writes were rejected with `ERROR 1452`. |
 | P2e provider/service checks | `c676f83 fix: add provider service db checks` | `scripts/db-integrity-p2e-provider-service-checks.sql` | `docs/db-integrity-p2e-provider-service-checks-acceptance.md` | `_tmp_db_backup/petpal-live-before-db-integrity-p2e-provider-service-checks-20260505-232912.sql` | `mvn -Dtest=PetPalServerMvcTest#dbIntegrityP2eRejectsInvalidProviderServiceCheckValues test`; `.\scripts\test-backend.ps1` passed with 61 tests | Invalid provider type/rating/deleted and service item price/duration/deleted writes were rejected with `ERROR 3819`. |
 | P2f user/post checks | `1824098 fix: add user post db checks` | `scripts/db-integrity-p2f-user-post-checks.sql` | `docs/db-integrity-p2f-user-post-checks-acceptance.md` | `_tmp_db_backup/petpal-live-before-db-integrity-p2f-user-post-checks-20260505-234601.sql` | `mvn -Dtest=PetPalServerMvcTest#dbIntegrityP2fRejectsInvalidUserPostCheckValues test`; `.\scripts\test-backend.ps1` passed with 62 tests | Invalid user deleted and post visibility/like count/comment count/deleted writes were rejected with `ERROR 3819`. |
+| P2g derived counts | `799ae42 fix: repair post derived counts` | `scripts/db-integrity-p2g-derived-counts.sql` | `docs/db-integrity-p2g-derived-counts-acceptance.md` | `_tmp_db_backup/petpal-live-before-db-integrity-p2g-derived-counts-20260506-144249.sql` | `mvn -Dtest=PetPalServerMvcTest#dbIntegrityP2gPostDerivedCountsMatchActualLikesAndRootComments test`; `mvn -Dtest=PetPalServerMvcTest#likeAndUnlikeAreIdempotent test`; `.\scripts\test-backend.ps1` passed with 63 tests | Live `post.like_count` and `post.comment_count` drift was repaired; `post_derived_count_drift = 0`, and post detail API smoke returned repaired counts. |
 
 ## Schema Constraint List
 
@@ -71,7 +72,7 @@ Primary keys are omitted from this list.
 | `appointment` | `order_no` unique; `uk_appointment_active_duplicate`; `fk_appointment_user_pet`; `fk_appointment_provider_service`; `chk_appointment_status`; `chk_appointment_deleted_bool` |
 | `service_review` | none |
 
-All 42 expected P0/P1/P2a-P2f constraints returned `present` from live `information_schema.table_constraints`.
+All 42 expected P0/P1/P2a-P2f constraints returned `present` from live `information_schema.table_constraints`. P2g adds no DDL constraint; it is covered by the derived-count drift check below.
 
 ## Live Invalid-Count Review
 
@@ -93,6 +94,7 @@ Result summary:
 | P2d | 9 | all `0` |
 | P2e | 6 | all `0` |
 | P2f | 5 | all `0` |
+| P2g | 1 | all `0` |
 
 The live DB also reports these current unconstrained status values:
 
@@ -108,9 +110,7 @@ The live DB also reports these current unconstrained status values:
 
 `user.status`, `post.status`, and `service_provider.status` still have no CHECK constraints. Current live rows are clean, but the code does not provide equally stable enum boundaries for all three. In particular, provider admin currently accepts arbitrary uppercased provider statuses, and existing tests cover `PAUSED`; adding a DB CHECK now would be a behavior decision, not only a DB integrity cleanup.
 
-`post.like_count` and `post.comment_count` now have non-negative CHECK constraints, but count correctness is separate. The live review found `post_like_count_drift = 2` and `post_comment_count_drift = 0`. Treat the like-count drift as a later derived-count audit or repair slice, not as a reason to add another CHECK.
-
-Follow-up: P2g repaired the live `post.like_count` drift and added a derived-count regression test. See `docs/db-integrity-p2g-derived-counts-acceptance.md`.
+`post.like_count` and `post.comment_count` now have non-negative CHECK constraints from P2f, and P2g repaired the live derived-count drift. The current summary script reports `post_derived_count_drift = 0`. This still does not add triggers; application write paths must keep counters aligned, and direct DB writes can still create future drift.
 
 ## Verification Run In This Review
 
@@ -119,9 +119,12 @@ Follow-up: P2g repaired the live `post.like_count` drift and added a derived-cou
 - `rg -n "CONSTRAINT|FOREIGN KEY|UNIQUE KEY|CHECK" petpal-server/src/main/resources/db/schema.sql`
 - `mysql --version`
 - `$env:MYSQL_PWD='54321'; mysql -uroot petpal --batch --raw --execute="source scripts/db-integrity-p2-summary-readonly.sql"`
+  - Result: MySQL `8.0.40`; all 42 expected P0/P1/P2a-P2f DDL constraints returned `present`; P2g `post_derived_count_drift = 0`; remaining `service_review` candidate counts all returned `0`.
+- `.\scripts\test-backend.ps1`
+  - Result: passed, `Tests run: 63, Failures: 0, Errors: 0, Skipped: 0`.
 
-Backend tests were not run in this review because this slice only adds documentation and a read-only SQL helper. No Java, `schema.sql`, seed data, API, phone client, or admin code changed.
+No Java, `schema.sql`, seed data, API, phone client, or admin code changed in this review update.
 
 ## Suggested Commit Message
 
-`docs: summarize db integrity p2 status`
+`docs: include p2g in db integrity summary`

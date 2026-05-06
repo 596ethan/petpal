@@ -35,7 +35,8 @@ JOIN information_schema.table_constraints tc
 WHERE cc.constraint_schema = DATABASE()
 ORDER BY tc.table_name, cc.constraint_name;
 
--- Expected P0/P1/P2a-P2f constraints and live presence.
+-- Expected P0/P1/P2a-P2f DDL constraints and live presence.
+-- P2g is a data-repair/audit slice and does not add DDL constraints.
 WITH expected_constraints AS (
   SELECT 'P0' AS stage, 'pet' AS table_name, 'uk_pet_owner_id' AS constraint_name, 'UNIQUE' AS constraint_type UNION ALL
   SELECT 'P0', 'service_item', 'uk_service_item_provider_id', 'UNIQUE' UNION ALL
@@ -93,7 +94,7 @@ LEFT JOIN information_schema.table_constraints tc
  AND tc.constraint_type = ec.constraint_type
 ORDER BY ec.stage, ec.table_name, ec.constraint_name;
 
--- Invalid or conflicting rows for P0/P1/P2a-P2f covered constraints.
+-- Invalid, conflicting, or drift rows for P0/P1/P2a-P2g covered checks.
 SELECT 'P0' AS stage,
        'post_pet_owner_mismatch' AS check_name,
        COUNT(*) AS invalid_count
@@ -287,9 +288,25 @@ WHERE comment_count < 0
 UNION ALL
 SELECT 'P2f', 'post_deleted_bool', COUNT(*)
 FROM post
-WHERE deleted NOT IN (0, 1);
+WHERE deleted NOT IN (0, 1)
+UNION ALL
+SELECT 'P2g', 'post_derived_count_drift', COUNT(*)
+FROM post p
+LEFT JOIN (
+  SELECT post_id, COUNT(*) AS actual_count
+  FROM post_like
+  GROUP BY post_id
+) pl ON pl.post_id = p.id
+LEFT JOIN (
+  SELECT post_id, COUNT(*) AS actual_count
+  FROM comment
+  WHERE parent_id IS NULL
+  GROUP BY post_id
+) c ON c.post_id = p.id
+WHERE p.like_count <> COALESCE(pl.actual_count, 0)
+   OR p.comment_count <> COALESCE(c.actual_count, 0);
 
--- Remaining P2 candidates that were not closed by P2a-P2f.
+-- Remaining P2 candidates that were not closed by P2a-P2g.
 SELECT 'service_review_appointment_orphan' AS check_name,
        COUNT(*) AS candidate_count
 FROM service_review sr
@@ -309,26 +326,7 @@ UNION ALL
 SELECT 'service_review_rating_out_of_range', COUNT(*)
 FROM service_review
 WHERE rating < 1
-   OR rating > 5
-UNION ALL
-SELECT 'post_like_count_drift', COUNT(*)
-FROM post p
-LEFT JOIN (
-  SELECT post_id, COUNT(*) AS actual_count
-  FROM post_like
-  GROUP BY post_id
-) pl ON pl.post_id = p.id
-WHERE p.like_count <> COALESCE(pl.actual_count, 0)
-UNION ALL
-SELECT 'post_comment_count_drift', COUNT(*)
-FROM post p
-LEFT JOIN (
-  SELECT post_id, COUNT(*) AS actual_count
-  FROM comment
-  WHERE parent_id IS NULL
-  GROUP BY post_id
-) c ON c.post_id = p.id
-WHERE p.comment_count <> COALESCE(c.actual_count, 0);
+   OR rating > 5;
 
 -- Live status values for columns without stable DB CHECK decisions yet.
 SELECT 'user.status' AS column_name,
