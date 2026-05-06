@@ -147,6 +147,8 @@ Admin note:
 
 - Appointment status transitions were verified through the admin HTTP endpoint with `X-PetPal-Admin-Token`.
 - The static `petpal-admin` page UI itself was not re-exercised in the phone continuation run.
+- This is a documented deviation from the original acceptance plan, which asked for the same backend port to be exercised through the static admin page UI for `CONFIRMED` and `COMPLETED`.
+- Deviation rationale: the live backend port, admin token gate, and both appointment status transitions were still verified against the real `/admin/appointments/{id}/status` endpoint, and the phone UI later reflected the resulting states. This reduced the gap to an admin-page UI rerun, but it does not equal a full rerun of the static admin page itself.
 
 ## Device Record
 
@@ -255,3 +257,4 @@ What passed:
 Residual note:
 
 - One uploaded MinIO object remains reachable by direct object URL because there is no current deletion API for stored objects. This residual object was recorded explicitly and was not mixed into the relational cleanup result.
+- One documented acceptance deviation remains: the static `petpal-admin` page UI was not rerun in this continuation pass even though the original plan listed it. The equivalent live backend status transitions were verified by direct admin endpoint calls on the same backend port, so this deviation was treated as non-blocking for the closure-candidate conclusion.
