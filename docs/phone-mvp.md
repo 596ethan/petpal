@@ -75,6 +75,47 @@ A phone user can browse providers, provider details, service items, and their ow
 - phone: empty state
 - phone: error state
 
+## Slice 2a: Appointment Find and Admin Paging
+
+### User goal
+- A phone user can quickly find a loaded appointment from their appointment list.
+- An admin can process appointments without rendering every historical order on one page.
+
+### Entry screen
+- `Cutepetpost/entry/src/main/ets/pages/Index.ets`
+- `petpal-admin/index.html`
+
+### API contract
+- `GET /api/appointment/list`
+  - remains the phone source of truth and still returns only the authenticated current user's appointments
+  - phone search filters the already loaded current-user appointment list
+- `GET /admin/appointments/page`
+  - Query:
+    - `pageNo?: number`, default `1`
+    - `pageSize?: number`, default `10`, max `50`
+    - `status?: AppointmentStatus`
+    - `keyword?: string`
+  - Success:
+    - returns `ApiPageResult<AppointmentDto>`
+    - `keyword` matches order number, pet name, provider name, service name, or remark
+
+### Success state
+- Phone appointment search narrows visible appointments by order number, provider, service, pet, appointment time, remark, or visible status text.
+- Empty search results show a distinct "not found" state without deleting the loaded appointment data.
+- Admin appointment processing uses server-side paging, page-size selection, status filtering, and keyword search.
+- Admin metrics still show total and pending appointment counts independent of the current filter.
+
+### Failure state
+- Phone search does not call mock data or a new unaccepted phone API.
+- Admin request failure shows the existing visible banner message.
+
+### Test cases
+- backend: admin appointment page returns the requested page and keeps the total count
+- backend: admin appointment page filters by status and keyword
+- phone: appointment search match state
+- phone: appointment search empty state
+- admin UI: appointment page-size, previous-page, next-page, status filter, and keyword search
+
 ## Slice 3: Appointment Create and Cancel
 
 ### User goal

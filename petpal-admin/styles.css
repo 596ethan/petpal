@@ -236,6 +236,16 @@ select {
 
 .toolbar {
   margin: 16px 0 18px;
+  flex-wrap: wrap;
+}
+
+.toolbar input {
+  min-width: min(360px, 100%);
+  flex: 1 1 280px;
+}
+
+.toolbar select {
+  flex: 0 0 auto;
 }
 
 .card-grid,
@@ -309,6 +319,20 @@ select {
 
 .table-wrap {
   overflow: auto;
+}
+
+.pagination-bar,
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination-bar {
+  justify-content: space-between;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 table {
@@ -395,5 +419,10 @@ dialog::backdrop {
   .metrics,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pagination-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

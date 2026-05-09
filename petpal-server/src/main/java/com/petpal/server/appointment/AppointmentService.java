@@ -2,6 +2,7 @@ package com.petpal.server.appointment;
 
 import com.petpal.server.appointment.dto.AppointmentCreateRequest;
 import com.petpal.server.appointment.dto.AppointmentDto;
+import com.petpal.server.common.api.ApiPageResult;
 import com.petpal.server.common.enums.AppointmentStatus;
 import com.petpal.server.common.error.AppException;
 import java.sql.ResultSet;
@@ -24,6 +25,9 @@ public class AppointmentService {
   private static final String APPOINTMENT_CONFLICT_CODE = "APPOINTMENT_CONFLICT";
   private static final String APPOINTMENT_CONFLICT_MESSAGE = "该宠物在此时间已有预约，请选择其他时间";
   private static final String ACTIVE_DUPLICATE_INDEX = "uk_appointment_active_duplicate";
+  private static final int DEFAULT_ADMIN_PAGE_NO = 1;
+  private static final int DEFAULT_ADMIN_PAGE_SIZE = 10;
+  private static final int MAX_ADMIN_PAGE_SIZE = 50;
   private final JdbcClient jdbcClient;
 
   public AppointmentService(JdbcClient jdbcClient) {
@@ -78,6 +82,34 @@ public class AppointmentService {
     return jdbcClient.sql(baseAppointmentSelect() + " ORDER BY a.id DESC")
       .query((rs, rowNum) -> mapAppointment(rs))
       .list();
+  }
+
+  public ApiPageResult<AppointmentDto> listAllPage(Integer requestedPageNo, Integer requestedPageSize, AppointmentStatus status, String keyword) {
+    int pageNo = normalizePageNo(requestedPageNo);
+    int pageSize = normalizePageSize(requestedPageSize);
+    long offset = (long) (pageNo - 1) * pageSize;
+    String normalizedKeyword = normalizeKeyword(keyword);
+    String whereClause = adminAppointmentWhereClause(status, normalizedKeyword);
+
+    JdbcClient.StatementSpec countSpec = bindAdminAppointmentFilters(
+      jdbcClient.sql("SELECT COUNT(*) " + baseAppointmentFrom() + whereClause),
+      status,
+      normalizedKeyword
+    );
+    Long total = countSpec.query(Long.class).single();
+
+    JdbcClient.StatementSpec listSpec = bindAdminAppointmentFilters(
+      jdbcClient.sql(baseAppointmentSelect() + whereClause + " ORDER BY a.id DESC LIMIT :limit OFFSET :offset"),
+      status,
+      normalizedKeyword
+    );
+    List<AppointmentDto> items = listSpec
+      .param("limit", pageSize)
+      .param("offset", offset)
+      .query((rs, rowNum) -> mapAppointment(rs))
+      .list();
+
+    return new ApiPageResult<>(items, pageNo, pageSize, total == null ? 0 : total);
   }
 
   public void cancel(long userId, Long appointmentId) {
@@ -229,11 +261,69 @@ public class AppointmentService {
     };
   }
 
+  private int normalizePageNo(Integer requestedPageNo) {
+    if (requestedPageNo == null || requestedPageNo < 1) {
+      return DEFAULT_ADMIN_PAGE_NO;
+    }
+    return requestedPageNo;
+  }
+
+  private int normalizePageSize(Integer requestedPageSize) {
+    if (requestedPageSize == null) {
+      return DEFAULT_ADMIN_PAGE_SIZE;
+    }
+    return Math.min(Math.max(requestedPageSize, 1), MAX_ADMIN_PAGE_SIZE);
+  }
+
+  private String normalizeKeyword(String keyword) {
+    if (keyword == null) {
+      return null;
+    }
+    String trimmed = keyword.trim().toLowerCase(Locale.ROOT);
+    if (trimmed.isEmpty()) {
+      return null;
+    }
+    return "%" + trimmed + "%";
+  }
+
+  private String adminAppointmentWhereClause(AppointmentStatus status, String normalizedKeyword) {
+    StringBuilder where = new StringBuilder(" WHERE 1 = 1");
+    if (status != null) {
+      where.append(" AND a.status = :status");
+    }
+    if (normalizedKeyword != null) {
+      where.append(" AND (")
+        .append(" LOWER(a.order_no) LIKE :keyword")
+        .append(" OR LOWER(p.name) LIKE :keyword")
+        .append(" OR LOWER(sp.name) LIKE :keyword")
+        .append(" OR LOWER(si.name) LIKE :keyword")
+        .append(" OR LOWER(COALESCE(a.remark, '')) LIKE :keyword")
+        .append(")");
+    }
+    return where.toString();
+  }
+
+  private JdbcClient.StatementSpec bindAdminAppointmentFilters(JdbcClient.StatementSpec spec, AppointmentStatus status, String normalizedKeyword) {
+    JdbcClient.StatementSpec bound = spec;
+    if (status != null) {
+      bound = bound.param("status", status.name());
+    }
+    if (normalizedKeyword != null) {
+      bound = bound.param("keyword", normalizedKeyword);
+    }
+    return bound;
+  }
+
   private String baseAppointmentSelect() {
     return """
       SELECT a.id, a.order_no, a.user_id, a.pet_id, p.name AS pet_name,
              a.provider_id, sp.name AS provider_name, a.service_id, si.name AS service_name,
              a.status, a.appointment_time, a.remark
+      """ + baseAppointmentFrom();
+  }
+
+  private String baseAppointmentFrom() {
+    return """
       FROM appointment a
       JOIN pet p ON p.id = a.pet_id
       JOIN service_provider sp ON sp.id = a.provider_id

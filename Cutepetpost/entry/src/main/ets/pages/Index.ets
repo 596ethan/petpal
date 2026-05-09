@@ -50,6 +50,7 @@ struct Index {
   @State posts: Post[] = []
   @State providers: ServiceProvider[] = []
   @State appointments: Appointment[] = []
+  @State appointmentSearch: string = ''
   @State isAuthenticated: boolean = PetPalRepository.getSession() !== null
   @State refreshError: string = ''
   @State refreshing: boolean = false
@@ -476,9 +477,13 @@ struct Index {
           BookingTab({
             isAuthenticated: this.isAuthenticated,
             appointments: this.appointments,
+            appointmentSearch: this.appointmentSearch,
             providers: this.providers,
             onGoLogin: () => {
               this.goToLogin()
+            },
+            onAppointmentSearchChange: (value: string) => {
+              this.appointmentSearch = value
             },
             onCancelAppointment: (appointmentId: number) => {
               void this.cancelAppointment(appointmentId)

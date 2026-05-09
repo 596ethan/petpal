@@ -485,6 +485,52 @@ class PetPalServerMvcTest {
   }
 
   @Test
+  void adminAppointmentPagePaginatesAndKeepsTotal() throws Exception {
+    insertAppointment("PP-PAGE-1", "PENDING_CONFIRM", "2099-03-01 10:00:00", "page one");
+    insertAppointment("PP-PAGE-2", "PENDING_CONFIRM", "2099-03-02 10:00:00", "page two");
+
+    mockMvc.perform(get("/admin/appointments/page")
+        .header("X-PetPal-Admin-Token", adminToken)
+        .param("pageNo", "1")
+        .param("pageSize", "2"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.code").value("OK"))
+      .andExpect(jsonPath("$.data.pageNo").value(1))
+      .andExpect(jsonPath("$.data.pageSize").value(2))
+      .andExpect(jsonPath("$.data.total").value(3))
+      .andExpect(jsonPath("$.data.items.length()").value(2))
+      .andExpect(jsonPath("$.data.items[0].orderNo").value("PP-PAGE-2"))
+      .andExpect(jsonPath("$.data.items[1].orderNo").value("PP-PAGE-1"));
+
+    mockMvc.perform(get("/admin/appointments/page")
+        .header("X-PetPal-Admin-Token", adminToken)
+        .param("pageNo", "2")
+        .param("pageSize", "2"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.total").value(3))
+      .andExpect(jsonPath("$.data.items.length()").value(1))
+      .andExpect(jsonPath("$.data.items[0].orderNo").value("PP202603260001"));
+  }
+
+  @Test
+  void adminAppointmentPageFiltersByStatusAndKeyword() throws Exception {
+    insertAppointment("PP-FILTER-PENDING", "PENDING_CONFIRM", "2099-03-03 10:00:00", "filter pending");
+    insertAppointment("PP-FILTER-CANCELLED", "CANCELLED", "2099-03-04 10:00:00", "filter cancelled");
+
+    mockMvc.perform(get("/admin/appointments/page")
+        .header("X-PetPal-Admin-Token", adminToken)
+        .param("pageNo", "1")
+        .param("pageSize", "10")
+        .param("status", "PENDING_CONFIRM")
+        .param("keyword", "filter"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.data.total").value(1))
+      .andExpect(jsonPath("$.data.items.length()").value(1))
+      .andExpect(jsonPath("$.data.items[0].orderNo").value("PP-FILTER-PENDING"))
+      .andExpect(jsonPath("$.data.items[0].status").value("PENDING_CONFIRM"));
+  }
+
+  @Test
   void createAppointmentGeneratesPendingOrder() throws Exception {
     String accessToken = loginAndGetAccessToken("13800000001", "123456");
     mockMvc.perform(post("/api/appointment")
@@ -1877,6 +1923,18 @@ class PetPalServerMvcTest {
       .andExpect(status().isOk())
       .andReturn();
     return readDataId(result.getResponse().getContentAsString());
+  }
+
+  private void insertAppointment(String orderNo, String status, String appointmentTime, String remark) {
+    jdbcClient.sql("""
+        INSERT INTO appointment (order_no, user_id, pet_id, provider_id, service_id, status, appointment_time, remark)
+        VALUES (:orderNo, 1, 1, 1, 1, :status, :appointmentTime, :remark)
+        """)
+      .param("orderNo", orderNo)
+      .param("status", status)
+      .param("appointmentTime", Timestamp.valueOf(LocalDateTime.parse(appointmentTime.replace(' ', 'T'))))
+      .param("remark", remark)
+      .update();
   }
 
   private long readDataId(String body) throws Exception {

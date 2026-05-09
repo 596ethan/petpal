@@ -6,7 +6,9 @@ import com.petpal.server.appointment.ProviderQueryService;
 import com.petpal.server.appointment.dto.AppointmentDto;
 import com.petpal.server.appointment.dto.AppointmentStatusUpdateRequest;
 import com.petpal.server.appointment.dto.ServiceProviderDto;
+import com.petpal.server.common.api.ApiPageResult;
 import com.petpal.server.common.api.ApiResponse;
+import com.petpal.server.common.enums.AppointmentStatus;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,6 +51,15 @@ public class AdminController {
   @GetMapping("/appointments")
   public ApiResponse<List<AppointmentDto>> appointments() {
     return ApiResponse.ok(appointmentService.listAll());
+  }
+
+  @GetMapping("/appointments/page")
+  public ApiResponse<ApiPageResult<AppointmentDto>> appointmentsPage(
+      @RequestParam(required = false) Integer pageNo,
+      @RequestParam(required = false) Integer pageSize,
+      @RequestParam(required = false) AppointmentStatus status,
+      @RequestParam(required = false) String keyword) {
+    return ApiResponse.ok(appointmentService.listAllPage(pageNo, pageSize, status, keyword));
   }
 
   @PutMapping("/appointments/{id}/status")

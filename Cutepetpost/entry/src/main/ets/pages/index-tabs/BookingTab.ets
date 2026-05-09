@@ -22,10 +22,30 @@ import {
 export interface BookingTabProps {
   isAuthenticated: boolean
   appointments: Appointment[]
+  appointmentSearch: string
   providers: ServiceProvider[]
   onGoLogin: () => void
+  onAppointmentSearchChange: (value: string) => void
   onCancelAppointment: (appointmentId: number) => void
   onOpenProvider: (providerId: number) => void
+}
+
+function normalizeAppointmentSearch(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function appointmentMatchesSearch(item: Appointment, keyword: string): boolean {
+  const normalizedKeyword = normalizeAppointmentSearch(keyword)
+  if (normalizedKeyword.length === 0) {
+    return true
+  }
+  return `${item.orderNo} ${item.providerName} ${item.serviceName} ${item.petName} ${item.appointmentTime} ${item.remark} ${statusText(item.status)}`
+    .toLowerCase()
+    .includes(normalizedKeyword)
+}
+
+function matchedAppointmentCount(appointments: Appointment[], keyword: string): number {
+  return appointments.filter((item: Appointment) => appointmentMatchesSearch(item, keyword)).length
 }
 
 @Builder
@@ -74,6 +94,34 @@ function AppointmentStoryCard(item: Appointment, onCancelAppointment: (appointme
   .padding(18)
   .backgroundColor(PetPalTheme.surfaceRaised)
   .borderRadius(PetPalTheme.radiusPanel)
+}
+
+@Builder
+function AppointmentSearchBox(value: string, onAppointmentSearchChange: (value: string) => void) {
+  Column({ space: 8 }) {
+    TextInput({ text: value, placeholder: '搜索订单号 / 机构 / 宠物 / 服务' })
+      .height(46)
+      .fontSize(14)
+      .fontColor(PetPalTheme.text)
+      .placeholderColor(PetPalTheme.textSubtle)
+      .backgroundColor(PetPalTheme.surface)
+      .borderRadius(PetPalTheme.radiusChip)
+      .onChange((nextValue: string) => {
+        onAppointmentSearchChange(nextValue)
+      })
+    if (value.trim().length > 0) {
+      Button('清空搜索')
+        .height(34)
+        .fontSize(12)
+        .fontColor(PetPalTheme.textMuted)
+        .backgroundColor(PetPalTheme.surfaceWarm)
+        .borderRadius(PetPalTheme.radiusChip)
+        .onClick(() => {
+          onAppointmentSearchChange('')
+        })
+    }
+  }
+  .width('100%')
 }
 
 @Builder
@@ -127,10 +175,17 @@ export function BookingTab($$: BookingTabProps) {
       if (!$$.isAuthenticated) {
         LoginRequiredPanel('登录后查看我的预约', $$.onGoLogin)
       } else if ($$.appointments.length > 0) {
-        Column({ space: 12 }) {
-          ForEach($$.appointments, (item: Appointment) => {
-            AppointmentStoryCard(item, $$.onCancelAppointment)
-          })
+        AppointmentSearchBox($$.appointmentSearch, $$.onAppointmentSearchChange)
+        if (matchedAppointmentCount($$.appointments, $$.appointmentSearch) > 0) {
+          Column({ space: 12 }) {
+            ForEach($$.appointments, (item: Appointment) => {
+              if (appointmentMatchesSearch(item, $$.appointmentSearch)) {
+                AppointmentStoryCard(item, $$.onCancelAppointment)
+              }
+            })
+          }
+        } else {
+          EmptyStatePanel('未找到预约', '换个订单号、机构、服务或宠物名称再试。')
         }
       } else {
         EmptyStatePanel('暂无预约', '创建第一条预约后会显示在这里。')

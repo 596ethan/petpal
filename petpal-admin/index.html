@@ -96,6 +96,7 @@
         </div>
 
         <div class="toolbar">
+          <input id="appointment-search" type="search" placeholder="搜索订单号、宠物、机构、服务或备注">
           <select id="appointment-status-filter">
             <option value="ALL">全部状态</option>
             <option value="PENDING_CONFIRM">待确认</option>
@@ -103,6 +104,11 @@
             <option value="COMPLETED">已完成</option>
             <option value="CANCELLED">已取消</option>
             <option value="EXPIRED">已过期</option>
+          </select>
+          <select id="appointment-page-size">
+            <option value="10">每页 10 条</option>
+            <option value="20">每页 20 条</option>
+            <option value="50">每页 50 条</option>
           </select>
         </div>
 
@@ -121,6 +127,13 @@
             </thead>
             <tbody id="appointment-list"></tbody>
           </table>
+        </div>
+        <div class="pagination-bar">
+          <span id="appointment-pagination-info">0 条结果</span>
+          <div class="pagination-actions">
+            <button class="ghost-button" id="appointment-prev-page" type="button">上一页</button>
+            <button class="ghost-button" id="appointment-next-page" type="button">下一页</button>
+          </div>
         </div>
       </section>
     </main>

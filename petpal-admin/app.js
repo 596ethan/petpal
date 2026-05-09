@@ -12,7 +12,13 @@ const state = {
   currentView: 'providers',
   providerSearch: '',
   providerStatus: 'ALL',
+  appointmentSearch: '',
   appointmentStatus: 'ALL',
+  appointmentPageNo: 1,
+  appointmentPageSize: 10,
+  appointmentPageTotal: 0,
+  appointmentGrandTotal: 0,
+  appointmentPendingTotal: 0,
   editingProviderId: null,
   providers: [],
   serviceGroups: [],
@@ -31,7 +37,12 @@ const els = {
   appointmentList: document.getElementById('appointment-list'),
   providerSearch: document.getElementById('provider-search'),
   providerStatusFilter: document.getElementById('provider-status-filter'),
+  appointmentSearch: document.getElementById('appointment-search'),
   appointmentStatusFilter: document.getElementById('appointment-status-filter'),
+  appointmentPageSize: document.getElementById('appointment-page-size'),
+  appointmentPaginationInfo: document.getElementById('appointment-pagination-info'),
+  appointmentPrevPage: document.getElementById('appointment-prev-page'),
+  appointmentNextPage: document.getElementById('appointment-next-page'),
   providerDialog: document.getElementById('provider-dialog'),
   providerDialogTitle: document.getElementById('provider-dialog-title'),
   providerForm: document.getElementById('provider-form'),
@@ -127,6 +138,7 @@ function setLoading(loading) {
   els.refreshButton.disabled = loading;
   els.addProviderButton.disabled = loading;
   renderConnectionStatus();
+  renderAppointmentPager();
 }
 
 function renderConnectionStatus() {
@@ -148,13 +160,12 @@ function renderViews() {
 }
 
 function renderMetrics() {
-  const pendingCount = state.appointments.filter((item) => item.status === 'PENDING_CONFIRM').length;
   const openCount = state.providers.filter((item) => normalizeProviderStatus(item.status) === 'OPEN').length;
   els.metrics.innerHTML = [
     metricCard('机构数', state.providers.length),
     metricCard('营业中', openCount),
-    metricCard('待确认', pendingCount),
-    metricCard('预约数', state.appointments.length)
+    metricCard('待确认', state.appointmentPendingTotal),
+    metricCard('预约数', state.appointmentGrandTotal)
   ].join('');
 }
 
@@ -287,9 +298,48 @@ async function loadProviders() {
   state.providers = providers.map(mapProvider);
 }
 
+function appointmentQueryPath(overrides = {}) {
+  const pageNo = overrides.pageNo || state.appointmentPageNo;
+  const pageSize = overrides.pageSize || state.appointmentPageSize;
+  const status = Object.prototype.hasOwnProperty.call(overrides, 'status') ? overrides.status : state.appointmentStatus;
+  const keyword = Object.prototype.hasOwnProperty.call(overrides, 'keyword') ? overrides.keyword : state.appointmentSearch;
+  const params = new URLSearchParams();
+  params.set('pageNo', String(pageNo));
+  params.set('pageSize', String(pageSize));
+  if (status && status !== 'ALL') {
+    params.set('status', status);
+  }
+  const trimmedKeyword = String(keyword || '').trim();
+  if (trimmedKeyword) {
+    params.set('keyword', trimmedKeyword);
+  }
+  return `/admin/appointments/page?${params.toString()}`;
+}
+
+async function fetchAppointmentPage(overrides = {}) {
+  return requestJson(appointmentQueryPath(overrides));
+}
+
 async function loadAppointments() {
-  const appointments = await requestJson('/admin/appointments');
-  state.appointments = appointments.map(mapAppointment);
+  const page = await fetchAppointmentPage();
+  const pageSize = Number(page.pageSize || state.appointmentPageSize);
+  const total = Number(page.total || 0);
+  const totalPages = total === 0 ? 1 : Math.ceil(total / pageSize);
+  if (total > 0 && Number(page.pageNo || state.appointmentPageNo) > totalPages) {
+    state.appointmentPageNo = totalPages;
+    return loadAppointments();
+  }
+  state.appointments = (page.items || []).map(mapAppointment);
+  state.appointmentPageNo = Number(page.pageNo || state.appointmentPageNo);
+  state.appointmentPageSize = pageSize;
+  state.appointmentPageTotal = total;
+}
+
+async function loadAppointmentMetrics() {
+  const allPage = await fetchAppointmentPage({ pageNo: 1, pageSize: 1, status: 'ALL', keyword: '' });
+  const pendingPage = await fetchAppointmentPage({ pageNo: 1, pageSize: 1, status: 'PENDING_CONFIRM', keyword: '' });
+  state.appointmentGrandTotal = Number(allPage.total || 0);
+  state.appointmentPendingTotal = Number(pendingPage.total || 0);
 }
 
 async function loadServiceGroups() {
@@ -357,10 +407,31 @@ async function renderServiceGroups() {
     : emptyState('未找到服务项目');
 }
 
+function appointmentTotalPages() {
+  if (state.appointmentPageTotal <= 0) {
+    return 1;
+  }
+  return Math.ceil(state.appointmentPageTotal / state.appointmentPageSize);
+}
+
+function renderAppointmentPager() {
+  const total = state.appointmentPageTotal;
+  els.appointmentPageSize.value = String(state.appointmentPageSize);
+  if (total <= 0) {
+    els.appointmentPaginationInfo.textContent = '0 条结果';
+    els.appointmentPrevPage.disabled = true;
+    els.appointmentNextPage.disabled = true;
+    return;
+  }
+  const totalPages = appointmentTotalPages();
+  els.appointmentPaginationInfo.textContent = `第 ${state.appointmentPageNo} / ${totalPages} 页，共 ${total} 条`;
+  els.appointmentPrevPage.disabled = state.loading || state.appointmentPageNo <= 1;
+  els.appointmentNextPage.disabled = state.loading || state.appointmentPageNo >= totalPages;
+}
+
 async function renderAppointments() {
-  const filtered = state.appointments.filter((item) => state.appointmentStatus === 'ALL' || item.status === state.appointmentStatus);
-  els.appointmentList.innerHTML = filtered.length > 0
-    ? filtered.map((item) => `
+  els.appointmentList.innerHTML = state.appointments.length > 0
+    ? state.appointments.map((item) => `
       <tr>
         <td>${item.orderNo}</td>
         <td>用户 ${item.userId}<br>${item.petName}</td>
@@ -372,6 +443,7 @@ async function renderAppointments() {
       </tr>
     `).join('')
     : `<tr><td colspan="7">${emptyStateText('未找到预约')}</td></tr>`;
+  renderAppointmentPager();
 }
 
 function emptyStateText(message) {
@@ -393,6 +465,12 @@ async function refreshAll() {
     await loadAppointments();
   } catch (error) {
     errors.push(`预约：${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    await loadAppointmentMetrics();
+  } catch (error) {
+    errors.push(`预约统计：${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
@@ -420,6 +498,16 @@ async function updateAppointmentStatus(id, status) {
     body: { status }
   });
   await refreshAll();
+}
+
+async function refreshAppointmentsView() {
+  try {
+    setBanner('', 'info');
+    await loadAppointments();
+    await renderAppointments();
+  } catch (error) {
+    setBanner(error instanceof Error ? error.message : String(error), 'error');
+  }
 }
 
 async function saveProvider(payload) {
@@ -474,9 +562,38 @@ els.providerStatusFilter.addEventListener('change', async (event) => {
   await renderProviders();
 });
 
+els.appointmentSearch.addEventListener('input', async (event) => {
+  state.appointmentSearch = event.target.value;
+  state.appointmentPageNo = 1;
+  await refreshAppointmentsView();
+});
+
 els.appointmentStatusFilter.addEventListener('change', async (event) => {
   state.appointmentStatus = event.target.value;
-  await renderAppointments();
+  state.appointmentPageNo = 1;
+  await refreshAppointmentsView();
+});
+
+els.appointmentPageSize.addEventListener('change', async (event) => {
+  state.appointmentPageSize = Number(event.target.value) || 10;
+  state.appointmentPageNo = 1;
+  await refreshAppointmentsView();
+});
+
+els.appointmentPrevPage.addEventListener('click', async () => {
+  if (state.appointmentPageNo <= 1) {
+    return;
+  }
+  state.appointmentPageNo -= 1;
+  await refreshAppointmentsView();
+});
+
+els.appointmentNextPage.addEventListener('click', async () => {
+  if (state.appointmentPageNo >= appointmentTotalPages()) {
+    return;
+  }
+  state.appointmentPageNo += 1;
+  await refreshAppointmentsView();
 });
 
 els.providerList.addEventListener('click', (event) => {
