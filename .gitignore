@@ -19,6 +19,14 @@ PHONE_MVP_SPEC.md
 !doc/
 !doc/**/*.md
 
+# Local/generated project notes and report assets.
+# Existing tracked files under these paths remain tracked; this only blocks new untracked files.
+.codex/
+doc/
+docs/
+CLAUDE.md
+scripts/export-drawio.ps1
+
 # HarmonyOS / Node build outputs
 **/build/
 **/.preview/
